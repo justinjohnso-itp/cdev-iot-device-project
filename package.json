@@ -6,7 +6,7 @@
   "scripts": {
     "clean-dist": "rm -rf dist && mkdir dist",
     "copy-log": "cp -r src/log.json dist",
-    "init": "npm run clean-dist && npm run copy-log",
+    "init": "npm run copy-log",
     "start": "npm run init && parcel",
     "build": "npm run init && parcel build --public-url ./",
     "deploy": "gh-pages -d dist"
