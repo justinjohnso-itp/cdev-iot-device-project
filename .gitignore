@@ -6,5 +6,4 @@
 *secrets*
 *log.json
 *node_modules
-*dist
 *.parcel-cache
