@@ -1,4 +1,8 @@
 import { Chart } from "chart.js/auto";
+import zoomPlugin from "chartjs-plugin-zoom";
+import "chartjs-scale-timestack";
+
+Chart.register(zoomPlugin);
 
 // Fetch data
 async function fetchData(url) {
@@ -33,7 +37,10 @@ async function drawChart() {
       datasets: [
         {
           label: "TOF Sensor Data",
-          data: sensorData.map((data) => data.sensor),
+          data: sensorData.map((data) => ({
+            x: new Date(data.time).getTime(),
+            y: data.sensor,
+          })),
           fill: false,
           borderColor: "rgb(75, 192, 192)",
           tension: 0.1,
@@ -49,9 +56,27 @@ async function drawChart() {
           },
         },
         x: {
+          // type: "timestack",
           title: {
             display: true,
             text: "Time",
+          },
+        },
+      },
+      plugins: {
+        zoom: {
+          zoom: {
+            wheel: {
+              enabled: true,
+              speed: 0.05,
+            },
+            drag: {
+              enabled: true,
+            },
+            pinch: {
+              enabled: true,
+            },
+            mode: "x",
           },
         },
       },
@@ -63,7 +88,10 @@ async function updateChart() {
   const sensorData = await fetchData("log.json");
   const labels = sensorData.map((data) => data.time);
   sensorChart.data.labels = labels;
-  sensorChart.data.datasets[0].data = sensorData.map((data) => data.sensor);
+  sensorChart.data.datasets[0].data = sensorData.map((data) => ({
+    x: new Date(data.time).getTime(),
+    y: data.sensor,
+  }));
   sensorChart.update();
 }
 
