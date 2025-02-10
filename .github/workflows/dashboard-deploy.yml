@@ -36,9 +36,6 @@ jobs:
       - name: Build with Parcel
         run: npm run build
 
-      - name: Copy log.json to build
-        run: cp log.json dist/
-
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
