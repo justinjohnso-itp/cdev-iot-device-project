@@ -142,7 +142,7 @@
       this[globalName] = mainExports;
     }
   }
-})({"8hGl2":[function(require,module,exports,__globalThis) {
+})({"9w8YQ":[function(require,module,exports,__globalThis) {
 var global = arguments[3];
 var HMR_HOST = null;
 var HMR_PORT = null;
@@ -660,7 +660,7 @@ async function updateChart() {
     setInterval(updateChart, 500);
 })();
 
-},{"chart.js/auto":"lfQHQ"}],"lfQHQ":[function(require,module,exports,__globalThis) {
+},{"chart.js/auto":"d8NN9"}],"d8NN9":[function(require,module,exports,__globalThis) {
 var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
 parcelHelpers.defineInteropFlag(exports);
 var _chartJs = require("../dist/chart.js");
@@ -668,7 +668,7 @@ parcelHelpers.exportAll(_chartJs, exports);
 (0, _chartJs.Chart).register(...(0, _chartJs.registerables));
 exports.default = (0, _chartJs.Chart);
 
-},{"../dist/chart.js":"3G2Tu","@parcel/transformer-js/src/esmodule-helpers.js":"3QV8O"}],"3G2Tu":[function(require,module,exports,__globalThis) {
+},{"../dist/chart.js":"ipU8D","@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"ipU8D":[function(require,module,exports,__globalThis) {
 /*!
  * Chart.js v4.4.7
  * https://www.chartjs.org
@@ -10907,7 +10907,7 @@ const registerables = [
     scales
 ];
 
-},{"./chunks/helpers.segment.js":"7RJ09","@kurkle/color":"aE5Ah","@parcel/transformer-js/src/esmodule-helpers.js":"3QV8O"}],"7RJ09":[function(require,module,exports,__globalThis) {
+},{"./chunks/helpers.segment.js":"7oQuk","@kurkle/color":"2aojw","@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"7oQuk":[function(require,module,exports,__globalThis) {
 /*!
  * Chart.js v4.4.7
  * https://www.chartjs.org
@@ -13476,7 +13476,7 @@ function styleChanged(style, prevStyle) {
     return JSON.stringify(style, replacer) !== JSON.stringify(prevStyle, replacer);
 }
 
-},{"@kurkle/color":"aE5Ah","@parcel/transformer-js/src/esmodule-helpers.js":"3QV8O"}],"aE5Ah":[function(require,module,exports,__globalThis) {
+},{"@kurkle/color":"2aojw","@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"2aojw":[function(require,module,exports,__globalThis) {
 /*!
  * @kurkle/color v0.3.4
  * https://github.com/kurkle/color#readme
@@ -14096,7 +14096,7 @@ function index_esm(input) {
     return new Color(input);
 }
 
-},{"@parcel/transformer-js/src/esmodule-helpers.js":"3QV8O"}],"3QV8O":[function(require,module,exports,__globalThis) {
+},{"@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"gkKU3":[function(require,module,exports,__globalThis) {
 exports.interopDefault = function(a) {
     return a && a.__esModule ? a : {
         default: a
@@ -14126,6 +14126,6 @@ exports.export = function(dest, destName, get) {
     });
 };
 
-},{}]},["8hGl2","bNKaB"], "bNKaB", "parcelRequire94c2")
+},{}]},["9w8YQ","bNKaB"], "bNKaB", "parcelRequire94c2")
 
 //# sourceMappingURL=index.0641b553.js.map
