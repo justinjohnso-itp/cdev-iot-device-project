@@ -28,7 +28,7 @@ async function fetchData(url) {
       labels: labels,
       datasets: [
         {
-          label: "My First Dataset",
+          label: "TOF Sensor Data",
           data: sensorData.map((data) => data.sensor),
           fill: false,
           borderColor: "rgb(75, 192, 192)",
