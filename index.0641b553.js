@@ -629,6 +629,22 @@ async function drawChart() {
                     tension: 0.1
                 }
             ]
+        },
+        options: {
+            scales: {
+                y: {
+                    title: {
+                        display: true,
+                        text: "Distance (mm)"
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: "Time"
+                    }
+                }
+            }
         }
     });
 }
