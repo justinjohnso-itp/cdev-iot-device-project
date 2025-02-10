@@ -2,10 +2,11 @@
   "name": "chartjs-example",
   "version": "1.0.0",
   "license": "MIT",
-  "main": "index.html",
+  "source": "src/index.html",
   "scripts": {
-    "dev": "parcel src/index.html",
-    "build": "parcel build src/index.html",
+    "start": "parcel",
+    "dev": "parcel",
+    "build": "parcel build",
     "deploy": "gh-pages -d dist"
   },
   "devDependencies": {

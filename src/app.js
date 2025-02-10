@@ -17,12 +17,16 @@ async function fetchData(url) {
     console.error(error.message);
   }
 }
+let sensorChart;
 
 // Chart.js
-(async function (url) {
+async function drawChart() {
   const sensorData = await fetchData("log.json");
   const labels = sensorData.map((data) => data.time);
-  new Chart(document.getElementById("tof-sensor"), {
+  if (sensorChart) {
+    sensorChart.destroy();
+  }
+  sensorChart = new Chart(document.getElementById("tof-sensor"), {
     type: "line",
     data: {
       labels: labels,
@@ -37,4 +41,17 @@ async function fetchData(url) {
       ],
     },
   });
+}
+
+async function updateChart() {
+  const sensorData = await fetchData("log.json");
+  const labels = sensorData.map((data) => data.time);
+  sensorChart.data.labels = labels;
+  sensorChart.data.datasets[0].data = sensorData.map((data) => data.sensor);
+  sensorChart.update();
+}
+
+(async function () {
+  await drawChart();
+  setInterval(updateChart, 500);
 })();
