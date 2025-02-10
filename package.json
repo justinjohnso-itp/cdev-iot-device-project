@@ -7,7 +7,7 @@
     "clean-dist": "rm -rf dist && mkdir dist",
     "copy-log": "cp -r src/log.json dist",
     "init": "npm run clean-dist && npm run copy-log",
-    "start": "npm run init && parcel --public-url ./",
+    "start": "npm run init && parcel --public-url .",
     "build": "npm run init && parcel build --public-url .",
     "deploy": "gh-pages -d dist"
   },
