@@ -40,6 +40,22 @@ async function drawChart() {
         },
       ],
     },
+    options: {
+      scales: {
+        y: {
+          title: {
+            display: true,
+            text: "Distance (mm)",
+          },
+        },
+        x: {
+          title: {
+            display: true,
+            text: "Time",
+          },
+        },
+      },
+    },
   });
 }
 
