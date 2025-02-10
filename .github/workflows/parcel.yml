@@ -1,4 +1,4 @@
-name: Build and Deploy
+name: TOF Sensor Dashboard - Build and Deploy
 
 on:
   push:
