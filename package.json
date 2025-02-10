@@ -1,5 +1,5 @@
 {
-  "name": "chartjs-example",
+  "name": "tof-sensor-dashboard",
   "version": "1.0.0",
   "license": "MIT",
   "source": "src/index.html",
