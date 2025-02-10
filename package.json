@@ -11,7 +11,7 @@
   },
   "devDependencies": {
     "gh-pages": "^6.3.0",
-    "parcel": "^2.6.2"
+    "parcel": "latest"
   },
   "dependencies": {
     "@cubejs-client/core": "^0.31.0",
