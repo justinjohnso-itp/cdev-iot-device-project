@@ -1,16 +1,12 @@
 {
 	"folders": [
 		{
-			"name": "cdev-iot-device-project",
-			"path": "."
-		},
-		{
 			"name": "callie-pigeon-dashboard",
 			"path": "callie-pigeon-dashboard"
 		},
 		{
-			"name": "dashboard-app",
-			"path": "dashboard-app"
+			"name": "justin-chartjs-dashboard",
+			"path": "justin-chartjs-dashboard"
 		},
 		{
 			"name": "arduino-code",
