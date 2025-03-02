@@ -1,9 +1,15 @@
 {
 	"folders": [
 		{
+			"name": "cdev-iot-device-project",
+			"path": "."
+		},
+		{
+			"name": "dashboard-app",
 			"path": "dashboard-app"
 		},
 		{
+			"name": "arduino-code",
 			"path": "arduino-code"
 		}
 	],
