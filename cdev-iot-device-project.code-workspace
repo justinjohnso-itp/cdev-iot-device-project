@@ -5,6 +5,10 @@
 			"path": "."
 		},
 		{
+			"name": "callie-pigeon-dashboard",
+			"path": "callie-pigeon-dashboard"
+		},
+		{
 			"name": "dashboard-app",
 			"path": "dashboard-app"
 		},
