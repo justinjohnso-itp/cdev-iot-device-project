@@ -1,10 +1,10 @@
 {
 	"folders": [
 		{
-			"path": "."
+			"path": "dashboard-app"
 		},
 		{
-			"path": "arduino"
+			"path": "arduino-code"
 		}
 	],
 	"settings": {
