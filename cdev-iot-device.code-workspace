@@ -1,0 +1,15 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "arduino"
+		}
+	],
+	"settings": {
+		"github-actions.workflows.pinned.workflows": [
+			"dynamic/pages/pages-build-deployment"
+		]
+	}
+}
