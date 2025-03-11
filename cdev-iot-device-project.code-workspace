@@ -11,11 +11,16 @@
 		{
 			"name": "arduino-code",
 			"path": "arduino-code"
+		},
+		{
+			"path": "mqtt-js-client"
 		}
 	],
 	"settings": {
 		"github-actions.workflows.pinned.workflows": [
 			"dynamic/pages/pages-build-deployment"
-		]
+		],
+		"liveServer.settings.multiRootWorkspaceName": "mqtt-js-client",
+		"liveServer.settings.port": 5501
 	}
 }
