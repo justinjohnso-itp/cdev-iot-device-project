@@ -7,6 +7,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="script.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.3/mqtt.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
   
 
@@ -175,24 +176,24 @@ p {
 <body>
 
   <div id="header-text">
-  <span id="pigeon-tracker">Pigeon Tracker</span>
-  <span id="online-time"> online since xxxx </span>
+  <span id="pigeon-tracker">Piano player tracker</span>
+  <!-- <span id="online-time"> online since xxxx </span> -->
 </div>
 
 <div class="dashboard">
   <div id="boxes">
     <div class="status-box">
-      <p class="box-header">Is there a pigeon on the windowsill right now?</p>
+      <p class="box-header">Is someone playing the piano right now?</p>
       <span id="currentPresence">Checking...</span>
     </div>
     <div class="status-box">
-      <p class="box-header">Pigeon stats</p>
+      <p class="box-header">Piano stats</p>
       <div class="pigeon-status-text">
-        <p>Total number of pigeons:</p>
-        <span id="totalPigeons">0</span>
+        <p>Total number of players:</p>
+        <span id="totalPlayers">0</span>
       </div>
       <div class="pigeon-status-text">
-        <p>Longest on windowsill:</p>
+        <p>Longest at piano:</p>
         <span id="longestDuration">0 sec</span>
       </div>
     </div>
@@ -200,12 +201,12 @@ p {
 </div>
 
 <div class="chart-container">
-  <h2>Pigeon Count <span id="chartDateRange"></span></h2>
+  <h2>Player count <span id="chartDateRange"></span></h2>
   <div class="toggle-buttons">
     <button id="weekView" class="active" onclick="toggleChart('week')">By Week</button>
     <button id="dayView" onclick="toggleChart('day')">By Day</button>
   </div>
-  <canvas id="pigeonChart"></canvas>
+  <canvas id="playerChart"></canvas>
   <canvas id="proximityChart"></canvas>
   <div class="pagination">
     <button onclick="prevPeriod()">← Previous</button>
