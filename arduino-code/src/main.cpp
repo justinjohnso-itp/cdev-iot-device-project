@@ -10,22 +10,17 @@
 
 const int micPin = A0;
 const int sampleSize = 10;
-const int playThreshold = 350;
-const int stopThreshold = 347; //this threshold is weirdly specific because the range outputted by the mic sensor is pretty small
-const int stopDelay = 30;
 const int maxDistance = 250;
-const int changeThreshold = 2;
 const long oledTimeout = 10000;  // oled timeout
 
 // FFT constants
 #define SAMPLES 128             // Must be a power of 2
 #define SAMPLING_FREQUENCY 5000 // Hz, must be less than 10000 due to ADC
-const int NUM_BANDS = 8;        // Number of frequency bands to track
 
 // FFT variables
 double vReal[SAMPLES];
 double vImag[SAMPLES];
-ArduinoFFT<double> FFT = ArduinoFFT<double>(vReal, vImag, SAMPLES, SAMPLING_FREQUENCY); // Proper initialization
+ArduinoFFT<double> FFT = ArduinoFFT<double>(vReal, vImag, SAMPLES, SAMPLING_FREQUENCY);
 unsigned int sampling_period_us;
 unsigned long microseconds;
 double dominantFrequency = 0;
@@ -39,7 +34,6 @@ int readings[sampleSize];
 int bufferIndex = 0;
 int total = 0;
 bool isPlaying = false;
-int belowThresholdCount = 0;
 bool personDetected = false;
 int lastSensorVal = 0;
 long lastSoundTime = 0;
@@ -47,6 +41,8 @@ long lastPersonTime = 0;  // Last time a person was detected
 long lastTimeSent = 0;
 int interval = 2000;  // Send MQTT data every 2 seconds
 long lastFFTTime = 0;  // Last time FFT was calculated
+long lastNoteTime = 0;  // Last time a note was detected
+const long silenceTimeout = 5000; // Reset note after 5 seconds of silence
 
 const int SCREEN_WIDTH = 128;
 const int SCREEN_HEIGHT = 32;
@@ -76,7 +72,7 @@ DisplayState currentDisplayState = STATE_OFF;
 // Microphone calibration constants for MAX9814 AGC Electret Microphone
 const int MIC_DC_OFFSET = 512;  // Microphone DC offset (for a 10-bit ADC, 0-1023 range)
 const int MIC_NOISE_FLOOR = 25; // Noise floor level to filter out background noise
-const int MIC_MIN_THRESHOLD = 40;  // Minimum level to consider as actual input
+const int MIC_MIN_THRESHOLD = 150;  // Adjusted to 150 (was 40)
 const int MIC_MAX_AMPLITUDE = 350; // Maximum expected amplitude based on AGC settings
 const float MIC_SCALE_FACTOR = 1.0;  // Scale factor for normalizing amplitude
 
@@ -103,6 +99,9 @@ const double NOTE_FREQUENCIES[] = {
 // Improved frequency detection parameters
 const double SAMPLING_FREQUENCY_ACTUAL = 4800; // Adjusted to account for sampling delay
 const int FFT_FREQUENCY_CORRECTION = 1;  // Correction factor for FFT frequency calculation
+
+// Update constants to include distance threshold
+const int DISTANCE_THRESHOLD = 150;  // Only process audio when distance is below 150mm
 
 // Function to convert frequency to musical note and octave using a lookup approach
 void frequencyToNote(float frequency, String &note, int &octave) {
@@ -238,6 +237,7 @@ double calculateDominantFrequency() {
   }
   
   // Only return frequency if it's significant and not background noise
+  // Added volume threshold check of 150 (MIC_MIN_THRESHOLD)
   if (peakValue > MIC_MIN_THRESHOLD) {
     return peakFreq; // Return the frequency for note determination
   }
@@ -407,10 +407,6 @@ void updateDisplay(DisplayState state, int micValue) {
   currentDisplayState = state;
 }
 
-// Add variables to track silence duration
-long lastNoteTime = 0;
-const long silenceTimeout = 5000; // Reset note after 5 seconds of silence
-
 void loop() {
   if (WiFi.status() != WL_CONNECTED) {
     connectToNetwork();
@@ -434,8 +430,8 @@ void loop() {
 
   // detect microphone playing using calibrated values
   int smoothedMicValue = getSmoothedMicValue();
-  // Use calibrated threshold instead of hard-coded value
-  isPlaying = (smoothedMicValue > MIC_MIN_THRESHOLD);
+  // Only consider playing if volume is above threshold AND person is close enough
+  isPlaying = (smoothedMicValue > MIC_MIN_THRESHOLD && sensorValSmoothed < DISTANCE_THRESHOLD);
 
   // Determine the display state
   DisplayState newDisplayState;
@@ -451,29 +447,38 @@ void loop() {
   }
   
   // Calculate FFT and detect pitch if playing or every 2 seconds
-  if (isPlaying || (millis() - lastFFTTime > 2000)) {
+  // Only process FFT if volume is above threshold AND person is close enough
+  if ((smoothedMicValue > MIC_MIN_THRESHOLD && sensorValSmoothed < DISTANCE_THRESHOLD) || 
+      (millis() - lastFFTTime > 2000 && personDetected)) {
     lastFFTTime = millis();
     
-    // Calculate dominant frequency using FFT
-    double newFrequency = calculateDominantFrequency();
-    
-    // Only update if we have a valid piano frequency (not background noise)
-    if (newFrequency > 0) {
-      dominantFrequency = newFrequency; // Update the global frequency variable
-      frequencyToNote(dominantFrequency, currentNote, currentOctave);
-      lastNoteTime = millis(); // Reset silence timer when a note is detected
+    // Only proceed with frequency calculation if volume is high enough AND person is close enough
+    if (smoothedMicValue > MIC_MIN_THRESHOLD && sensorValSmoothed < DISTANCE_THRESHOLD) {
+      // Calculate dominant frequency using FFT
+      double newFrequency = calculateDominantFrequency();
       
-      // Debug output
-      Serial.print("Frequency: ");
-      Serial.print(dominantFrequency);
-      Serial.print(" Hz, Note: ");
-      Serial.print(currentNote);
-      Serial.println(currentOctave);
-      
-      // Immediately update the display if playing
-      if (isPlaying) {
-        updateDisplay(STATE_PLAYING, smoothedMicValue);
-        lastSoundTime = millis();
+      // Only update if we have a valid piano frequency
+      if (newFrequency > 0) {
+        dominantFrequency = newFrequency; // Update the global frequency variable
+        frequencyToNote(dominantFrequency, currentNote, currentOctave);
+        lastNoteTime = millis(); // Reset silence timer when a note is detected
+        
+        // Debug output
+        Serial.print("Distance: ");
+        Serial.print(sensorValSmoothed);
+        Serial.print("mm, Volume: ");
+        Serial.print(smoothedMicValue);
+        Serial.print(", Frequency: ");
+        Serial.print(dominantFrequency);
+        Serial.print(" Hz, Note: ");
+        Serial.print(currentNote);
+        Serial.println(currentOctave);
+        
+        // Immediately update the display if playing
+        if (isPlaying) {
+          updateDisplay(STATE_PLAYING, smoothedMicValue);
+          lastSoundTime = millis();
+        }
       }
     }
   }
