@@ -25,7 +25,7 @@
 
 //////// shiftr.io, requires username and password
 // (see options variable below):
-const broker = "wss://public.cloud.shiftr.io:443";
+const broker = "wss://tigoe.net/mqtt";
 
 //////// test.mosquitto.org, uses no username and password:
 // const broker = 'wss://test.mosquitto.org:8081';
@@ -43,11 +43,11 @@ let options = {
   // add a random number for a unique client ID:
   clientId: "mqttJsClient-conndev-pianoclient-" + Math.random() * 1000,
   // add these in for public.cloud.shiftr.io:
-  username: "public",
-  password: "public",
+  username: "conndev",
+  password: "b4s1l!",
 };
 // topic to subscribe to when you connect:
-let topic = "2462072/mpptlogger/life";
+let topic = "conndev/piano";
 // divs to show messages:
 let localDiv, remoteDiv;
 // whether the client should be publishing or not:
