@@ -10,8 +10,12 @@
 
 const int micPin = A0;
 const int sampleSize = 10;
-const int maxDistance = 250;
+const int maxDistance = 250; // This is now replaced by DISTANCE_MAX_THRESHOLD
 const long oledTimeout = 10000;  // oled timeout
+
+// Add distance threshold constants
+const int DISTANCE_MIN_THRESHOLD = 75;  // Minimum distance threshold (75mm)
+const int DISTANCE_MAX_THRESHOLD = 200; // Maximum distance threshold (200mm)
 
 // FFT constants
 #define SAMPLES 128             // Must be a power of 2
@@ -59,15 +63,14 @@ int port = 1883;
 char topic[] = "conndev/piano";
 String clientID = "justin-nano33iot-";
 
-// Add a display state tracking variable
-enum DisplayState {
-  STATE_PLAYING,
-  STATE_LISTENING,
-  STATE_READY,
-  STATE_OFF
+// Replace the current DisplayState enum with this clearer PianoState
+enum PianoState {
+  STATE_NO_PRESENCE,    // No one at piano
+  STATE_PRESENCE_ONLY,  // Someone at piano but not playing
+  STATE_PLAYING         // Someone at piano and playing
 };
 
-DisplayState currentDisplayState = STATE_OFF;
+PianoState currentState = STATE_NO_PRESENCE;
 
 // Microphone calibration constants for MAX9814 AGC Electret Microphone
 const int MIC_DC_OFFSET = 512;  // Microphone DC offset (for a 10-bit ADC, 0-1023 range)
@@ -102,6 +105,17 @@ const int FFT_FREQUENCY_CORRECTION = 1;  // Correction factor for FFT frequency 
 
 // Update constants to include distance threshold
 const int DISTANCE_THRESHOLD = 150;  // Only process audio when distance is below 150mm
+
+// Function prototypes - must be before they're used
+void frequencyToNote(float frequency, String &note, int &octave);
+double calculateDominantFrequency();
+void connectToNetwork();
+boolean connectToBroker();
+int getSmoothedMicValue();
+void calculateAndProcessAudio(int distance, int volume);
+bool needsDisplayUpdate(PianoState state, int micValue);
+void updateDisplay(PianoState state, int micValue);
+void handleState(PianoState state, bool personDetected, bool isPlaying, int distance, int volume);
 
 // Function to convert frequency to musical note and octave using a lookup approach
 void frequencyToNote(float frequency, String &note, int &octave) {
@@ -329,222 +343,198 @@ int getSmoothedMicValue() {
   return total / sampleSize;
 }
 
-// Function to update the display based on current state
-void updateDisplay(DisplayState state, int micValue) {
-  display.clearDisplay();
-  display.setTextColor(SSD1306_WHITE);
-  
-  switch(state) {
-    case STATE_PLAYING:
-      {
-        // Header
-        display.setTextSize(1);
-        display.setCursor(0, 0);
-        display.println("Playing:");
-        
-        // Note name in large text
-        display.setTextSize(2);
-        display.setCursor(0, 10);
-        display.print(currentNote);
-        display.print(currentOctave);
-        
-        // Frequency in smaller text
-        display.setTextSize(1);
-        display.setCursor(70, 16);
-        display.print(int(dominantFrequency));
-        display.print(" Hz");
-      }
-      break;
-      
-    case STATE_LISTENING:
-      {
-        display.setTextSize(1);
-        display.setCursor(0, 0);
-        display.println("Listening...");
-        
-        // Show volume level
-        display.setCursor(0, 12);
-        display.print("Volume: ");
-        
-        // Simple volume bar
-        int barLength = map(constrain(micValue, 300, 600), 300, 600, 0, 40);
-        for (int i = 0; i < barLength; i++) {
-          display.fillRect(40 + i, 12, 1, 8, SSD1306_WHITE);
-        }
-        
-        // Last frequency if available
-        if (dominantFrequency > 0) {
-          display.setCursor(0, 24);
-          display.print("Last: ");
-          display.print(int(dominantFrequency));
-          display.print(" Hz");
-        }
-      }
-      break;
-      
-    case STATE_READY:
-      {
-        display.setTextSize(1);
-        display.setCursor(0, 0);
-        display.println("Ready to play!");
-        
-        // Animated prompt
-        long animTime = millis() % 2000;
-        if (animTime < 1000) {
-          display.setCursor(0, 16);
-          display.println("Please sit down");
-        }
-      }
-      break;
-      
-    case STATE_OFF:
-    default:
-      // Display is off, nothing to draw
-      break;
-  }
-  
-  display.display();
-  currentDisplayState = state;
-}
-
 void loop() {
+  // Check network connections
   if (WiFi.status() != WL_CONNECTED) {
     connectToNetwork();
     return;
   }
   if (!mqttClient.connected()) {
-    Serial.println("Reconnecting MQTT...");
     connectToBroker();
   }
   mqttClient.poll();
 
-  // detect a person 
+  // Read and smooth sensor values
   int sensorVal = sensor.readRangeContinuousMillimeters();
   int sensorValSmoothed = lastSensorVal * 0.9 + sensorVal * 0.1;
   lastSensorVal = sensorValSmoothed;
-  personDetected = (sensorValSmoothed < maxDistance);
-
-  if (personDetected) {
-    lastPersonTime = millis();  
-  }
-
-  // detect microphone playing using calibrated values
+  
+  // Detect presence - person is in valid distance range
+  bool personDetected = (sensorValSmoothed >= DISTANCE_MIN_THRESHOLD && 
+                         sensorValSmoothed <= DISTANCE_MAX_THRESHOLD);
+  
+  // Get microphone value
   int smoothedMicValue = getSmoothedMicValue();
-  // Only consider playing if volume is above threshold AND person is close enough
-  isPlaying = (smoothedMicValue > MIC_MIN_THRESHOLD && sensorValSmoothed < DISTANCE_THRESHOLD);
-
-  // Determine the display state
-  DisplayState newDisplayState;
   
-  if (!personDetected && millis() - lastPersonTime > oledTimeout) {
-    newDisplayState = STATE_OFF;
-  } else if (!personDetected) {
-    newDisplayState = STATE_READY;
-  } else if (isPlaying && dominantFrequency > 0) {
-    newDisplayState = STATE_PLAYING;
+  // Detect if playing - needs both presence AND volume above threshold
+  bool isPlaying = personDetected && (smoothedMicValue > MIC_MIN_THRESHOLD);
+
+  // Determine current state
+  PianoState newState;
+  if (!personDetected) {
+    newState = STATE_NO_PRESENCE;
+  } else if (!isPlaying) {
+    newState = STATE_PRESENCE_ONLY;
   } else {
-    newDisplayState = STATE_LISTENING;
-  }
-  
-  // Calculate FFT and detect pitch if playing or every 2 seconds
-  // Only process FFT if volume is above threshold AND person is close enough
-  if ((smoothedMicValue > MIC_MIN_THRESHOLD && sensorValSmoothed < DISTANCE_THRESHOLD) || 
-      (millis() - lastFFTTime > 2000 && personDetected)) {
-    lastFFTTime = millis();
-    
-    // Only proceed with frequency calculation if volume is high enough AND person is close enough
-    if (smoothedMicValue > MIC_MIN_THRESHOLD && sensorValSmoothed < DISTANCE_THRESHOLD) {
-      // Calculate dominant frequency using FFT
-      double newFrequency = calculateDominantFrequency();
-      
-      // Only update if we have a valid piano frequency
-      if (newFrequency > 0) {
-        dominantFrequency = newFrequency; // Update the global frequency variable
-        frequencyToNote(dominantFrequency, currentNote, currentOctave);
-        lastNoteTime = millis(); // Reset silence timer when a note is detected
-        
-        // Debug output
-        Serial.print("Distance: ");
-        Serial.print(sensorValSmoothed);
-        Serial.print("mm, Volume: ");
-        Serial.print(smoothedMicValue);
-        Serial.print(", Frequency: ");
-        Serial.print(dominantFrequency);
-        Serial.print(" Hz, Note: ");
-        Serial.print(currentNote);
-        Serial.println(currentOctave);
-        
-        // Immediately update the display if playing
-        if (isPlaying) {
-          updateDisplay(STATE_PLAYING, smoothedMicValue);
-          lastSoundTime = millis();
-        }
-      }
-    }
+    newState = STATE_PLAYING;
   }
 
-  // Check if we should reset the note state due to silence
-  if (dominantFrequency > 0 && !isPlaying && millis() - lastNoteTime > silenceTimeout) {
-    // Reset note state after silence timeout
-    dominantFrequency = 0;
-    currentNote = "";
-    currentOctave = 0;
-    Serial.println("Note state reset due to silence");
-    
-    // Update display to reflect reset
-    if (personDetected) {
-      updateDisplay(STATE_LISTENING, smoothedMicValue);
-    }
-  }
-
-  // Update the display if state changes or periodically for animations
-  bool updateNeeded = (currentDisplayState != newDisplayState);
+  // Handle state transition or continued state
+  handleState(newState, personDetected, isPlaying, sensorValSmoothed, smoothedMicValue);
   
-  // Always update READY state for animation
-  if (newDisplayState == STATE_READY && (millis() % 1000) < 50) {
-    updateNeeded = true;
+  // Update display if needed
+  if (currentState != newState || 
+      needsDisplayUpdate(newState, smoothedMicValue)) {
+    updateDisplay(newState, smoothedMicValue);
+    currentState = newState;
   }
   
-  // Update LISTENING state periodically to show volume changes
-  if (newDisplayState == STATE_LISTENING && millis() - lastSoundTime > 500) {
-    updateNeeded = true;
-    lastSoundTime = millis();
-  }
-  
-  // Update the display's volume bar with properly scaled values
-  if (updateNeeded) {
-    updateDisplay(newDisplayState, smoothedMicValue);
-  }
-
-  // continue sending MQTT if the person is still sitting there
-  if (personDetected && millis() - lastTimeSent > interval) {
-    lastTimeSent = millis();
-      
-    // send message MQTT with pitch information
-    String message = "distance: " + String(sensorValSmoothed) + 
-                     " volume: " + String(smoothedMicValue);
-    
-    // Add frequency and note information if available
-    if (dominantFrequency > 0) {
-      message += " frequency: " + String(int(dominantFrequency));
-      
-      if (currentNote != "" && currentNote != "---") {
-        message += " note: " + currentNote + 
-                  " octave: " + String(currentOctave);
-      }
-    }
-    
-    mqttClient.beginMessage(topic);
-    mqttClient.print(message);
-    mqttClient.endMessage();
-    Serial.println("Published: " + message);
-  }
-
-  // wait 10s then turn off the oled if the person has left to conserve energy
-  if (!personDetected && millis() - lastPersonTime > oledTimeout) { 
+  // Power saving: turn off display after timeout period of no presence
+  if (newState == STATE_NO_PRESENCE && 
+      millis() - lastPersonTime > oledTimeout) {
     display.clearDisplay();
     display.display();
   }
 
-  delay(10); // Reduced delay for better sampling
+  delay(10);
+}
+
+void handleState(PianoState state, bool personDetected, bool isPlaying, 
+                int distance, int volume) {
+  
+  // Update timing variables
+  if (personDetected) {
+    lastPersonTime = millis();
+  }
+  
+  // Execute state-specific logic
+  switch (state) {
+    case STATE_NO_PRESENCE:
+      // No presence - nothing to do
+      break;
+      
+    case STATE_PRESENCE_ONLY:
+      // Person present but not playing
+      // Send presence data every interval
+      if ((unsigned long)(millis() - lastTimeSent) > (unsigned long)interval) {
+        lastTimeSent = millis();
+        String message = "distance: " + String(distance) + 
+                         " volume: " + String(volume) + 
+                         " presence: true";
+        
+        mqttClient.beginMessage(topic);
+        mqttClient.print(message);
+        mqttClient.endMessage();
+        Serial.println("Published presence: " + message);
+      }
+      break;
+      
+    case STATE_PLAYING:
+      // Person present and playing - calculate frequency and send data
+      calculateAndProcessAudio(distance, volume);
+      break;
+  }
+}
+
+void calculateAndProcessAudio(int distance, int volume) {
+  // Only calculate frequency if we're actively playing
+  double newFrequency = calculateDominantFrequency();
+  
+  if (newFrequency > 0) {
+    dominantFrequency = newFrequency;
+    frequencyToNote(dominantFrequency, currentNote, currentOctave);
+    lastNoteTime = millis();
+    
+    // Send MQTT message with all the data we have
+    if ((unsigned long)(millis() - lastTimeSent) > (unsigned long)interval) {
+      lastTimeSent = millis();
+      
+      String message = "distance: " + String(distance) + 
+                      " volume: " + String(volume) +
+                      " frequency: " + String(int(dominantFrequency)) +
+                      " note: " + currentNote +
+                      " octave: " + String(currentOctave) +
+                      " presence: true playing: true";
+      
+      mqttClient.beginMessage(topic);
+      mqttClient.print(message);
+      mqttClient.endMessage();
+      Serial.println("Published playing: " + message);
+    }
+  }
+}
+
+bool needsDisplayUpdate(PianoState state, int micValue) {
+  // Check if we need to update display based on current state
+  switch(state) {
+    case STATE_NO_PRESENCE:
+      // Update "Ready" message animation every second
+      return (millis() % 1000) < 50;
+    
+    case STATE_PRESENCE_ONLY:
+      // Update volume bar every 500ms
+      return ((unsigned long)(millis() - lastSoundTime) > 500UL);
+    
+    case STATE_PLAYING:
+      // Always update when playing and note changes
+      return true;
+  }
+  return false;
+}
+
+void updateDisplay(PianoState state, int micValue) {
+  display.clearDisplay();
+  display.setTextColor(SSD1306_WHITE);
+  
+  // Variable declarations outside of case statements to avoid jump errors
+  int barLength = 0;
+  
+  switch(state) {
+    case STATE_NO_PRESENCE:
+      // "Ready" display
+      display.setTextSize(1);
+      display.setCursor(0, 0);
+      display.println("Ready to play!");
+      display.setCursor(0, 16);
+      display.println("Please sit down");
+      break;
+      
+    case STATE_PRESENCE_ONLY:
+      // "Listening" display
+      display.setTextSize(1);
+      display.setCursor(0, 0);
+      display.println("Listening...");
+      
+      // Simple volume bar
+      display.setCursor(0, 12);
+      display.print("Volume: ");
+      barLength = map(constrain(micValue, 0, MIC_MAX_AMPLITUDE), 
+                      0, MIC_MAX_AMPLITUDE, 0, 40);
+      for (int i = 0; i < barLength; i++) {
+        display.fillRect(40 + i, 12, 1, 8, SSD1306_WHITE);
+      }
+      break;
+      
+    case STATE_PLAYING:
+      // "Playing" display with note information
+      display.setTextSize(1);
+      display.setCursor(0, 0);
+      display.println("Playing:");
+      
+      // Note name in large text
+      display.setTextSize(2);
+      display.setCursor(0, 10);
+      display.print(currentNote);
+      display.print(currentOctave);
+      
+      // Frequency in smaller text
+      display.setTextSize(1);
+      display.setCursor(70, 16);
+      display.print(int(dominantFrequency));
+      display.print(" Hz");
+      break;
+  }
+  
+  display.display();
+  lastSoundTime = millis();
 }
