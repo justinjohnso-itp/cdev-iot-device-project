@@ -196,19 +196,12 @@ double calculateDominantFrequency() {
     vImag[i] = 0;
   }
   
-  // Timing variables to measure actual sampling frequency
-  unsigned long startTime = micros();
-  
   // Sample the audio input with proper calibration
+  unsigned long startTime = micros();
   for (int i = 0; i < SAMPLES; i++) {
     microseconds = micros();
-    
-    // Read from the ADC, apply offset and scaling
     int rawValue = analogRead(micPin);
-    // Center the signal around 0 using the DC offset
     vReal[i] = (rawValue - MIC_DC_OFFSET) * MIC_SCALE_FACTOR;
-    
-    // Wait for the sampling period
     while (micros() < microseconds + sampling_period_us) {
       // Do nothing - wait
     }
@@ -227,39 +220,47 @@ double calculateDominantFrequency() {
   // Convert from complex to magnitude
   FFT.complexToMagnitude();
   
-  // Find the peak magnitude and its index, avoiding very low frequencies
+  // Store magnitude spectrum for HPS
+  double magnitudeSpectrum[SAMPLES/2];
+  for (int i = 0; i < SAMPLES/2; i++) {
+    magnitudeSpectrum[i] = vReal[i];
+  }
+  
+  // Apply Harmonic Product Spectrum (HPS)
+  const int numHarmonics = 3;  // Use 3 harmonics
+  
+  // Create HPS spectrum (initialized with original spectrum)
+  double hpsSpectrum[SAMPLES/2];
+  for (int i = 0; i < SAMPLES/2; i++) {
+    hpsSpectrum[i] = magnitudeSpectrum[i];
+  }
+  
+  // Multiply by downsampled versions
+  for (int harmonic = 2; harmonic <= numHarmonics; harmonic++) {
+    for (int i = 0; i < SAMPLES/(2*harmonic); i++) {
+      // Each harmonic is at exactly harmonic*frequency
+      hpsSpectrum[i] *= magnitudeSpectrum[i * harmonic];
+    }
+  }
+  
+  // Find the peak in the HPS
   double peakValue = 0;
   uint16_t peakIndex = 0;
   
-  // Skip the first few bins which often contain DC and very low frequency noise
-  // Look for peaks starting from bin 3 (helps avoid low frequency noise)
+  // Skip the first few bins (DC and very low freq)
   for (int i = 3; i < SAMPLES/2; i++) {
-    if (vReal[i] > peakValue) {
-      peakValue = vReal[i];
+    if (hpsSpectrum[i] > peakValue) {
+      peakValue = hpsSpectrum[i];
       peakIndex = i;
     }
   }
   
-  // Calculate frequency using the formula with actual sampling frequency
+  // Calculate frequency from peak index
   double peakFreq = peakIndex * (actualSamplingFreq / SAMPLES);
   
-  // Debug info about the FFT calculation
-  // if (peakValue > MIC_MIN_THRESHOLD) {
-  //   Serial.print("FFT Peak: bin ");
-  //   Serial.print(peakIndex);
-  //   Serial.print(", value ");
-  //   Serial.print(peakValue);
-  //   Serial.print(", actual sampling rate: ");
-  //   Serial.print(actualSamplingFreq);
-  //   Serial.print(" Hz, calculated frequency: ");
-  //   Serial.print(peakFreq);
-  //   Serial.println(" Hz");
-  // }
-  
-  // Only return frequency if it's significant and not background noise
-  // Added volume threshold check of 150 (MIC_MIN_THRESHOLD)
+  // Only return if significant
   if (peakValue > MIC_MIN_THRESHOLD) {
-    return peakFreq; // Return the frequency for note determination
+    return peakFreq;
   }
   
   return 0;
