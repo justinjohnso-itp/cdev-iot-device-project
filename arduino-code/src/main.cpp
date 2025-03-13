@@ -10,12 +10,11 @@
 
 const int micPin = A0;
 const int sampleSize = 10;
-const int maxDistance = 250; // This is now replaced by DISTANCE_MAX_THRESHOLD
 const long oledTimeout = 10000;  // oled timeout
 
 // Add distance threshold constants
 const int DISTANCE_MIN_THRESHOLD = 75;  // Minimum distance threshold (75mm)
-const int DISTANCE_MAX_THRESHOLD = 200; // Maximum distance threshold (200mm)
+const int DISTANCE_MAX_THRESHOLD = 400; // Maximum distance threshold (400mm)
 
 // FFT constants
 #define SAMPLES 128             // Must be a power of 2
@@ -75,7 +74,7 @@ PianoState currentState = STATE_NO_PRESENCE;
 // Microphone calibration constants for MAX9814 AGC Electret Microphone
 const int MIC_DC_OFFSET = 512;  // Microphone DC offset (for a 10-bit ADC, 0-1023 range)
 const int MIC_NOISE_FLOOR = 25; // Noise floor level to filter out background noise
-const int MIC_MIN_THRESHOLD = 150;  // Adjusted to 150 (was 40)
+const int MIC_MIN_THRESHOLD = 120;  // Adjusted to 150 (was 40)
 const int MIC_MAX_AMPLITUDE = 350; // Maximum expected amplitude based on AGC settings
 const float MIC_SCALE_FACTOR = 1.0;  // Scale factor for normalizing amplitude
 
@@ -105,6 +104,13 @@ const int FFT_FREQUENCY_CORRECTION = 1;  // Correction factor for FFT frequency 
 
 // Update constants to include distance threshold
 const int DISTANCE_THRESHOLD = 150;  // Only process audio when distance is below 150mm
+
+// Add these variables near other timing variables at the top
+unsigned long lastDisplayUpdateTime = 0;  // Last time display was updated
+const long DISPLAY_UPDATE_INTERVAL = 250; // Minimum 250ms between display updates
+String lastDisplayedNote = "";   // Track the last displayed note
+int lastDisplayedOctave = 0;     // Track the last displayed octave
+double lastDisplayedFrequency = 0.0; // Last displayed frequency
 
 // Function prototypes - must be before they're used
 void frequencyToNote(float frequency, String &note, int &octave);
@@ -160,18 +166,18 @@ void frequencyToNote(float frequency, String &note, int &octave) {
     note = noteNames[noteIndex];
     
     // Debug output for verification
-    Serial.print("Raw freq: ");
-    Serial.print(frequency);
-    Serial.print(" Hz, Corrected: ");
-    Serial.print(correctedFreq);
-    Serial.print(" Hz -> ");
-    Serial.print(note);
-    Serial.print(octave);
-    Serial.print(" (");
-    Serial.print(NOTE_FREQUENCIES[closestNoteIndex]);
-    Serial.print(" Hz, diff: ");
-    Serial.print(minDifference * 100);
-    Serial.println("%)");
+    // Serial.print("Raw freq: ");
+    // Serial.print(frequency);
+    // Serial.print(" Hz, Corrected: ");
+    // Serial.print(correctedFreq);
+    // Serial.print(" Hz -> ");
+    // Serial.print(note);
+    // Serial.print(octave);
+    // Serial.print(" (");
+    // Serial.print(NOTE_FREQUENCIES[closestNoteIndex]);
+    // Serial.print(" Hz, diff: ");
+    // Serial.print(minDifference * 100);
+    // Serial.println("%)");
   } else {
     note = "---";
     octave = 0;
@@ -238,17 +244,17 @@ double calculateDominantFrequency() {
   double peakFreq = peakIndex * (actualSamplingFreq / SAMPLES);
   
   // Debug info about the FFT calculation
-  if (peakValue > MIC_MIN_THRESHOLD) {
-    Serial.print("FFT Peak: bin ");
-    Serial.print(peakIndex);
-    Serial.print(", value ");
-    Serial.print(peakValue);
-    Serial.print(", actual sampling rate: ");
-    Serial.print(actualSamplingFreq);
-    Serial.print(" Hz, calculated frequency: ");
-    Serial.print(peakFreq);
-    Serial.println(" Hz");
-  }
+  // if (peakValue > MIC_MIN_THRESHOLD) {
+  //   Serial.print("FFT Peak: bin ");
+  //   Serial.print(peakIndex);
+  //   Serial.print(", value ");
+  //   Serial.print(peakValue);
+  //   Serial.print(", actual sampling rate: ");
+  //   Serial.print(actualSamplingFreq);
+  //   Serial.print(" Hz, calculated frequency: ");
+  //   Serial.print(peakFreq);
+  //   Serial.println(" Hz");
+  // }
   
   // Only return frequency if it's significant and not background noise
   // Added volume threshold check of 150 (MIC_MIN_THRESHOLD)
@@ -383,10 +389,14 @@ void loop() {
   handleState(newState, personDetected, isPlaying, sensorValSmoothed, smoothedMicValue);
   
   // Update display if needed
-  if (currentState != newState || 
-      needsDisplayUpdate(newState, smoothedMicValue)) {
+  // If state has changed, always update the display
+  if (currentState != newState) {
     updateDisplay(newState, smoothedMicValue);
     currentState = newState;
+  } 
+  // Otherwise only update if the current state needs it
+  else if (needsDisplayUpdate(newState, smoothedMicValue)) {
+    updateDisplay(newState, smoothedMicValue);
   }
   
   // Power saving: turn off display after timeout period of no presence
@@ -411,6 +421,26 @@ void handleState(PianoState state, bool personDetected, bool isPlaying,
   switch (state) {
     case STATE_NO_PRESENCE:
       // No presence - nothing to do
+      // When appropriate, send a message indicating no presence
+      if ((unsigned long)(millis() - lastTimeSent) > (unsigned long)interval) {
+        lastTimeSent = millis();
+        
+        // Create JSON formatted string with all fields - null for audio data, false for presence
+        String jsonMessage = "{";
+        jsonMessage += "\"distance\":" + String(distance) + ",";
+        jsonMessage += "\"volume\":" + String(volume) + ",";
+        jsonMessage += "\"frequency\":null,";
+        jsonMessage += "\"note\":null,";
+        jsonMessage += "\"octave\":null,";
+        jsonMessage += "\"presence\":false,";
+        jsonMessage += "\"playing\":false";
+        jsonMessage += "}";
+        
+        mqttClient.beginMessage(topic);
+        mqttClient.print(jsonMessage);
+        mqttClient.endMessage();
+        Serial.println("Published no presence: " + jsonMessage);
+      }
       break;
       
     case STATE_PRESENCE_ONLY:
@@ -418,14 +448,22 @@ void handleState(PianoState state, bool personDetected, bool isPlaying,
       // Send presence data every interval
       if ((unsigned long)(millis() - lastTimeSent) > (unsigned long)interval) {
         lastTimeSent = millis();
-        String message = "distance: " + String(distance) + 
-                         " volume: " + String(volume) + 
-                         " presence: true";
+        
+        // Create JSON formatted string - include all fields, null for audio data
+        String jsonMessage = "{";
+        jsonMessage += "\"distance\":" + String(distance) + ",";
+        jsonMessage += "\"volume\":" + String(volume) + ",";
+        jsonMessage += "\"frequency\":null,";
+        jsonMessage += "\"note\":null,";
+        jsonMessage += "\"octave\":null,";
+        jsonMessage += "\"presence\":true,";
+        jsonMessage += "\"playing\":false";
+        jsonMessage += "}";
         
         mqttClient.beginMessage(topic);
-        mqttClient.print(message);
+        mqttClient.print(jsonMessage);
         mqttClient.endMessage();
-        Serial.println("Published presence: " + message);
+        Serial.println("Published presence: " + jsonMessage);
       }
       break;
       
@@ -449,35 +487,61 @@ void calculateAndProcessAudio(int distance, int volume) {
     if ((unsigned long)(millis() - lastTimeSent) > (unsigned long)interval) {
       lastTimeSent = millis();
       
-      String message = "distance: " + String(distance) + 
-                      " volume: " + String(volume) +
-                      " frequency: " + String(int(dominantFrequency)) +
-                      " note: " + currentNote +
-                      " octave: " + String(currentOctave) +
-                      " presence: true playing: true";
+      // Create JSON formatted string - include all fields
+      String jsonMessage = "{";
+      jsonMessage += "\"distance\":" + String(distance) + ",";
+      jsonMessage += "\"volume\":" + String(volume) + ",";
+      
+      // Include note and frequency data - always include fields
+      jsonMessage += "\"frequency\":" + String(int(dominantFrequency)) + ",";
+      
+      // Check if we have valid note data
+      if (currentNote != "" && currentNote != "---") {
+        jsonMessage += "\"note\":\"" + currentNote + "\",";
+        jsonMessage += "\"octave\":" + String(currentOctave) + ",";
+      } else {
+        jsonMessage += "\"note\":null,";
+        jsonMessage += "\"octave\":null,";
+      }
+      
+      jsonMessage += "\"presence\":true,";
+      jsonMessage += "\"playing\":true";
+      jsonMessage += "}";
       
       mqttClient.beginMessage(topic);
-      mqttClient.print(message);
+      mqttClient.print(jsonMessage);
       mqttClient.endMessage();
-      Serial.println("Published playing: " + message);
+      Serial.println("Published playing: " + jsonMessage);
     }
   }
 }
 
 bool needsDisplayUpdate(PianoState state, int micValue) {
+  // Always enforce minimum time between any display updates
+  if (millis() - lastDisplayUpdateTime < DISPLAY_UPDATE_INTERVAL) {
+    return false; // Too soon for another update
+  }
+  
   // Check if we need to update display based on current state
   switch(state) {
     case STATE_NO_PRESENCE:
-      // Update "Ready" message animation every second
-      return (millis() % 1000) < 50;
+      // Only update once when transitioning to this state
+      // The display will show static "Ready" message until timeout
+      return false; // No periodic updates for this state
     
     case STATE_PRESENCE_ONLY:
       // Update volume bar every 500ms
       return ((unsigned long)(millis() - lastSoundTime) > 500UL);
     
     case STATE_PLAYING:
-      // Always update when playing and note changes
-      return true;
+      // Only update when the note or frequency changes significantly
+      if (currentNote != lastDisplayedNote || 
+          currentOctave != lastDisplayedOctave ||
+          abs(dominantFrequency - lastDisplayedFrequency) > 2.0) {
+        return true;
+      }
+      // Otherwise update periodically but not too often
+      return ((millis() - lastDisplayUpdateTime) > 750);
   }
   return false;
 }
@@ -532,9 +596,15 @@ void updateDisplay(PianoState state, int micValue) {
       display.setCursor(70, 16);
       display.print(int(dominantFrequency));
       display.print(" Hz");
+      
+      // Save what we displayed for comparison later
+      lastDisplayedNote = currentNote;
+      lastDisplayedOctave = currentOctave;
+      lastDisplayedFrequency = dominantFrequency;
       break;
   }
   
   display.display();
   lastSoundTime = millis();
+  lastDisplayUpdateTime = millis(); // Track when we updated the display
 }
