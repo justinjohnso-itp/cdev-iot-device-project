@@ -1,21 +1,11 @@
 {
 	"folders": [
 		{
-			"name": "justin-chartjs-dashboard",
-			"path": "justin-chartjs-dashboard"
-		},
-		{
 			"name": "arduino-code",
 			"path": "arduino-code"
 		},
 		{
-			"path": "mqtt-js-client"
-		},
-		{
-			"path": "callie-piano-dashboard-v3"
-		},
-		{
-			"path": "nodejs-dashboard"
+			"path": "callie-piano-dashboard-v4"
 		}
 	],
 	"settings": {
