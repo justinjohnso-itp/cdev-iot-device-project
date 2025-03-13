@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Piano Player Tracker</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.10.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.10.0/firebase-firestore-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="script.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.3/mqtt.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+  
+
+
+  <style>
+    body {
+  font-family: Inter, sans-serif;
+  text-align: center;
+  background-color: #f5f5f5;
+  padding: 20px;
+  margin: 0; /* Ensure no extra margin */
+}
+    h2{
+      margin:8px;
+    }
+
+p {
+  color: #363636;
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 300;
+  
+}
+
+#header-text {
+  display: flex;
+  flex-wrap: wrap;
+  width: 100%;
+  align-items: center;
+  gap: 16px;
+}
+
+.dashboard {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 20px;
+  padding-bottom: 20px;
+  flex-wrap: wrap; /* Ensures wrapping if screen is small */
+}
+
+.status-box {
+  background: white;
+  padding-left: 20px;
+    padding-right: 20px;
+    padding-bottom: 20px;
+      padding-top: 10px;
+
+
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  font-size: 20px;
+  font-weight: bold;
+  text-align: left;
+  flex: 1; /* Make them flexible */
+  min-width: 200px; /* Prevents cramping on smaller screens */
+  display: flex;
+  flex-direction: column;
+}
+
+.status-box span {
+  color: #52CF8C;
+  font-size: 24px;
+}
+
+.chart-container {
+  /* max-width: 1000px; Limits chart size */
+  margin: auto;
+  background: white;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  display:flex;
+  flex-direction:column;
+  justify-items:left;
+}
+
+.toggle-buttons {
+  display: flex;
+  justify-content: center;
+  margin-top: 10px;
+}
+
+.toggle-buttons button {
+  padding: 10px;
+  margin: 5px;
+  border: none;
+  background-color: #ddd;
+  cursor: pointer;
+  border-radius:4px;
+}
+
+.toggle-buttons button.active {
+  background-color: #bbb;
+}
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  margin-top: 10px;
+}
+
+.pagination button {
+  padding: 10px;
+  margin: 5px;
+  border: none;
+  background-color: #ddd;
+  cursor: pointer;
+  border-radius: 4px;
+
+}
+
+.pagination button:hover {
+  background-color: #ccc;
+}
+
+#boxes {
+  display: flex;
+  justify-content: center;
+  align-items: stretch; /* Ensures both boxes have the same height */
+  gap: 16px;
+  flex-wrap: wrap;
+  width: 100%;
+  /* max-width: 900px; */
+  margin: auto;
+}
+
+.pigeon-status-text {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  font-weight: 400;
+  font-size: 18px;
+    align-items: center;
+
+}
+
+.pigeon-status-text span {
+  font-weight: bold;
+  font-size: 20px;
+  color: #363636;
+}
+
+.box-header {
+  border-bottom: 1px solid #DCDCDC;
+    color:#6E6E6E;
+
+  padding-bottom: 16px;
+  font-weight:300;
+}
+
+#pigeon-tracker {
+  color: #363636;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+#online-time {
+  color: #6E6E6E;
+  font-size: 16px;
+  font-weight: 300;
+}
+    
+  </style>
+</head>
+<body>
+
+  <div id="header-text">
+  <span id="pigeon-tracker">Piano player tracker</span>
+  <!-- <span id="online-time"> online since xxxx </span> -->
+</div>
+
+<div class="dashboard">
+  <div id="boxes">
+    <div class="status-box">
+      <p class="box-header">Is someone playing the piano right now?</p>
+      <span id="currentPresence">Checking...</span>
+    </div>
+    <div class="status-box">
+      <p class="box-header">Piano stats</p>
+      <div class="pigeon-status-text">
+        <p>Total number of players:</p>
+        <span id="totalPlayers">0</span>
+      </div>
+      <div class="pigeon-status-text">
+        <p>Longest at piano:</p>
+        <span id="longestDuration">0 sec</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="chart-container">
+  <h2>Player count <span id="chartDateRange"></span></h2>
+  <div class="toggle-buttons">
+    <button id="weekView" class="active" onclick="toggleChart('week')">By Week</button>
+    <button id="dayView" onclick="toggleChart('day')">By Day</button>
+  </div>
+  <canvas id="playerChart"></canvas>
+  <canvas id="proximityChart"></canvas>
+  <div class="pagination">
+    <button onclick="prevPeriod()">← Previous</button>
+    <button onclick="nextPeriod()">Next →</button>
+  </div>
+</div>
+
+</body>
+</html>
