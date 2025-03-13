@@ -74,7 +74,7 @@ PianoState currentState = STATE_NO_PRESENCE;
 // Microphone calibration constants for MAX9814 AGC Electret Microphone
 const int MIC_DC_OFFSET = 512;  // Microphone DC offset (for a 10-bit ADC, 0-1023 range)
 const int MIC_NOISE_FLOOR = 25; // Noise floor level to filter out background noise
-const int MIC_MIN_THRESHOLD = 120;  // Adjusted to 150 (was 40)
+const int MIC_MIN_THRESHOLD = 130;  // Adjusted to 150 (was 40)
 const int MIC_MAX_AMPLITUDE = 350; // Maximum expected amplitude based on AGC settings
 const float MIC_SCALE_FACTOR = 1.0;  // Scale factor for normalizing amplitude
 
