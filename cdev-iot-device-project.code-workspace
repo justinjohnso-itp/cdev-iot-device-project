@@ -1,10 +1,6 @@
 {
 	"folders": [
 		{
-			"name": "callie-pigeon-dashboard",
-			"path": "callie-pigeon-dashboard"
-		},
-		{
 			"name": "justin-chartjs-dashboard",
 			"path": "justin-chartjs-dashboard"
 		},
@@ -14,6 +10,12 @@
 		},
 		{
 			"path": "mqtt-js-client"
+		},
+		{
+			"path": "callie-piano-dashboard-v3"
+		},
+		{
+			"path": "nodejs-dashboard"
 		}
 	],
 	"settings": {

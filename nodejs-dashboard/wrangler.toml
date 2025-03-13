@@ -1,0 +1,14 @@
+name = "piano-dashboard"
+main = "./functions/api/[[route]].js"
+compatibility_date = "2023-11-15"
+
+[triggers]
+crons = ["*/5 * * * *"] # Run every 5 minutes
+
+[[d1_databases]]
+binding = "DB"
+database_name = "piano_data"
+database_id = "YOUR_DB_ID_AFTER_CREATION"
+
+[env.production]
+# Production environment variables

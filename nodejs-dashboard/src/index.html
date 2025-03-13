@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Piano Activity Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Piano Activity Dashboard</h1>
+            <div class="status-indicator">
+                <span id="connectionStatus" class="status">⚫ Connecting...</span>
+            </div>
+        </header>
+
+        <div class="dashboard-grid">
+            <!-- Stats Cards -->
+            <div class="stats-container">
+                <div class="stat-card">
+                    <div class="stat-label">Current Presence</div>
+                    <div id="currentPresence" class="stat-value">No</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Total Players</div>
+                    <div id="totalPlayers" class="stat-value">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Longest Session</div>
+                    <div id="longestDuration" class="stat-value">0 min 0 sec</div>
+                </div>
+            </div>
+
+            <!-- Chart Controls -->
+            <div class="chart-controls">
+                <div class="view-toggle">
+                    <button id="weekView" class="toggle-btn active" onclick="toggleChart('week')">Weekly View</button>
+                    <button id="dayView" class="toggle-btn" onclick="toggleChart('day')">Daily View</button>
+                </div>
+                <div class="pagination">
+                    <button onclick="prevPeriod()" class="arrow-btn">◀</button>
+                    <span id="periodLabel">Last 7 Days</span>
+                    <button onclick="nextPeriod()" class="arrow-btn">▶</button>
+                </div>
+            </div>
+
+            <!-- Charts -->
+            <div class="chart-container">
+                <canvas id="playerChart"></canvas>
+                <canvas id="proximityChart"></canvas>
+                <canvas id="frequencyChart"></canvas>
+            </div>
+
+            <!-- Current Note Display -->
+            <div id="noteDisplay" class="note-display">
+                <div class="note-label">Last Detected Note</div>
+                <div class="note-value">--</div>
+                <div class="frequency-value">-- Hz</div>
+            </div>
+        </div>
+
+        <footer>
+            <p>Connected Devices & Networked Interaction - Spring '25</p>
+        </footer>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom"></script>
+    <script src="app.js"></script>
+</body>
+</html>

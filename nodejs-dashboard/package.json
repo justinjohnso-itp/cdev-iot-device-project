@@ -1,0 +1,27 @@
+{
+  "name": "piano-dashboard",
+  "version": "1.0.0",
+  "description": "Piano activity dashboard with MQTT and Cloudflare D1",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "wrangler pages dev ./src --port 3000",
+    "build": "mkdir -p public && cp -r src/* public/",
+    "deploy": "wrangler pages publish ./src",
+    "setup": "node setup.js"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.3",
+    "express": "^4.18.2",
+    "mqtt": "^4.3.7"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.22",
+    "wrangler": "^3.19.0"
+  }
+}

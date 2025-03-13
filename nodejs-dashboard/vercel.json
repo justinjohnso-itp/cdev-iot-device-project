@@ -1,0 +1,43 @@
+{
+  "version": 2,
+  "buildCommand": "npm run build",
+  "builds": [
+    {
+      "src": "server.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/**/*.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "public/**",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/$1"
+    },
+    {
+      "src": "/status",
+      "dest": "/api/status.js"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/public/$1"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/mqtt-listener",
+      "schedule": "*/5 * * * *"
+    }
+  ],
+  "env": {
+    "PORT": "3000",
+    "MQTT_USER": "conndev",
+    "MQTT_PASSWORD": "b4s1l!"
+  }
+}
