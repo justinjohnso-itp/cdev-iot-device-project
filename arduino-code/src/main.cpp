@@ -42,7 +42,8 @@ int lastSensorVal = 0;
 long lastSoundTime = 0;
 long lastPersonTime = 0;  // Last time a person was detected
 long lastTimeSent = 0;
-int interval = 2000;  // Send MQTT data every 2 seconds
+int interval = 2000;            // Default interval for presence/playing states (2 seconds)
+const int noPresenceInterval = 60000;  // 1 minute interval for no presence state
 long lastFFTTime = 0;  // Last time FFT was calculated
 long lastNoteTime = 0;  // Last time a note was detected
 const long silenceTimeout = 5000; // Reset note after 5 seconds of silence
@@ -421,9 +422,8 @@ void handleState(PianoState state, bool personDetected, bool isPlaying,
   // Execute state-specific logic
   switch (state) {
     case STATE_NO_PRESENCE:
-      // No presence - nothing to do
-      // When appropriate, send a message indicating no presence
-      if ((unsigned long)(millis() - lastTimeSent) > (unsigned long)interval) {
+      // No presence - Use the longer interval (1 minute)
+      if ((unsigned long)(millis() - lastTimeSent) > (unsigned long)noPresenceInterval) {
         lastTimeSent = millis();
         
         // Create JSON formatted string with all fields - null for audio data, false for presence
