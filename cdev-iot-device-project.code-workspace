@@ -1,11 +1,10 @@
 {
 	"folders": [
 		{
-			"name": "arduino-code",
 			"path": "arduino-code"
 		},
 		{
-			"path": "callie-piano-dashboard-v4"
+			"path": "callie-piano-dashboard"
 		}
 	],
 	"settings": {
