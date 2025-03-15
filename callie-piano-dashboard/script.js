@@ -15,6 +15,7 @@ let topic = "conndev/piano";
 
 // Dashboard Data
 let presence = false;
+let playing = false;
 let playerData = {}; // Stores daily player counts
 let proximityData = []; // Stores all sensor readings for "by day" chart
 let playerDetected = false;
@@ -24,6 +25,13 @@ let startDate = new Date();
 startDate.setDate(startDate.getDate() - 6); // Default to last 7 days
 let chartMode = "week"; // 'week' or 'day'
 let playerChart, proximityChart;
+
+// New tracking variables for smoother detection
+let recentVolumeReadings = []; // Store last 3 volume readings - reduced from 5
+let recentPresenceReadings = []; // Store last 5 presence readings
+let volumeThreshold = 165; // Volume threshold for playing detection
+const requiredVolumesAboveThreshold = 2; // Need 2 high volumes to consider "playing" - reduced from 3
+const requiredPresencesToLeave = 5; // Need 5 consecutive absence readings to consider "left"
 
 // Add this near the other constants at the top
 const COLLECTION_NAME = "piano_data-1";
@@ -44,6 +52,13 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
+// Format time for display (seconds to MM:SS)
+function formatTime(seconds) {
+  let minutes = Math.floor(seconds / 60);
+  let remainingSeconds = Math.floor(seconds % 60);
+  return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
+}
+
 // **MQTT Setup**
 function setupMQTT() {
   client = mqtt.connect(broker, options);
@@ -55,14 +70,14 @@ function setupMQTT() {
 
 // **MQTT Connect Event**
 function onConnect() {
-  console.log("Connected to MQTT broker!");
+  // console.log("Connected to MQTT broker!");
   client.subscribe(topic);
 }
 
 // **MQTT Message Handling**
 function onMessage(topic, payload) {
   let message = payload.toString();
-  console.log("MQTT Message Received:", message);
+  // console.log("MQTT Message Received:", message);
 
   try {
     let data = JSON.parse(message); // ✅ Parse JSON
@@ -80,12 +95,8 @@ function checkPresenceTimeout() {
   let timeSinceLastMessage = currentTime - lastMessageTime;
 
   if (timeSinceLastMessage > messageTimeout) {
-    console.log(
-      "🚨 No messages received for",
-      messageTimeout / 1000,
-      "seconds. Assuming person has left."
-    );
-    updatePresence(false, new Date()); // ✅ Manually switch presence to false
+    // console.log("🚨 No messages received for", messageTimeout / 1000, "seconds. Assuming person has left.");
+    updatePresence(false, false, new Date()); // ✅ Manually switch presence to false
   }
 
   setTimeout(checkPresenceTimeout, 1000); // ✅ Check every second
@@ -97,7 +108,7 @@ function onError(error) {
 }
 
 function onDisconnect() {
-  console.log("Disconnected from MQTT broker.");
+  // console.log("Disconnected from MQTT broker.");
 }
 
 let lastPlayerTime = 0; // ✅ Tracks the last time a player was counted
@@ -119,16 +130,38 @@ async function incrementPlayerCount(timestamp) {
     // ✅ Update UI
     document.getElementById("totalPlayers").innerText = totalPlayers;
 
-    // ✅ Store in Firestore
+    // console.log(`Player count incremented for ${currentDate}. New total: ${totalPlayers}`);
+
+    // ✅ Store in Firestore - both in global stats and in daily records
     try {
+      // Update the global counter
       await db.collection("stats").doc("global").set(
         {
           totalPlayers: totalPlayers,
         },
         { merge: true }
       );
+
+      // Store/update the daily count in a separate collection for persistence
+      const dailyRef = db.collection("player_counts").doc(currentDate);
+      const dailyDoc = await dailyRef.get();
+
+      if (dailyDoc.exists) {
+        // Update existing count
+        await dailyRef.update({
+          count: playerData[currentDate],
+        });
+      } else {
+        // Create new daily record
+        await dailyRef.set({
+          date: currentDate,
+          count: playerData[currentDate],
+        });
+      }
+
+      // console.log(`✅ Updated player count in Firestore for ${currentDate}: ${playerData[currentDate]}`);
     } catch (error) {
-      console.error("🚨 Error updating total players in Firestore:", error);
+      console.error("🚨 Error updating player counts in Firestore:", error);
     }
 
     updateCharts();
@@ -140,82 +173,142 @@ async function incrementPlayerCount(timestamp) {
 function mapProximity(distance) {
   return Math.max(0, 250 - distance) / 2.5; // Convert range into 0-100 scale
 }
+
 // **Process Incoming Sensor Data**
 function processSensorData(data, timestamp) {
-  console.log(
-    `Distance: ${data.distance}, Volume: ${data.volume}, Presence: ${data.presence}, Playing: ${data.playing}`
-  );
+  // console.log(`Distance: ${data.distance}, Volume: ${data.volume}, Presence: ${data.presence}, Playing: ${data.playing}`);
+
+  // Track recent volume readings (keep last 3 - reduced from 5)
+  recentVolumeReadings.push(data.volume);
+  if (recentVolumeReadings.length > 3) {
+    recentVolumeReadings.shift(); // Remove oldest reading
+  }
+
+  // Track recent presence readings (keep last 5)
+  recentPresenceReadings.push(data.presence);
+  if (recentPresenceReadings.length > 5) {
+    recentPresenceReadings.shift(); // Remove oldest reading
+  }
+
+  // For very high volumes, immediately consider as playing
+  const isVeryHighVolume = data.volume >= volumeThreshold + 20; // 185+ is definitely playing
+
+  // Calculate if someone is playing based on volume pattern
+  // Need at least 2 out of 3 recent readings above threshold to consider "playing"
+  const volumesAboveThreshold = recentVolumeReadings.filter(
+    (v) => v >= volumeThreshold
+  ).length;
+  const smoothedPlaying =
+    isVeryHighVolume || volumesAboveThreshold >= requiredVolumesAboveThreshold;
+
+  // Calculate if someone is present based on consecutive readings
+  // Need all 5 most recent readings to be false to consider "not present"
+  const consecutiveAbsences = recentPresenceReadings.filter(
+    (p) => p === false
+  ).length;
+  const smoothedPresence = !(consecutiveAbsences >= requiredPresencesToLeave);
+
+  // Log the smoothed detection values
+  // console.log(`Smoothed detection: presence=${smoothedPresence} (${consecutiveAbsences}/5 absent), playing=${smoothedPlaying} (${volumesAboveThreshold}/3 volumes above ${volumeThreshold})`);
+  // if (isVeryHighVolume) console.log("Very high volume detected - immediate playing state!");
 
   let entry = {
     time: timestamp.toISOString(),
     distance: mapProximity(data.distance),
     volume: data.volume,
-    presence: data.presence,
-    playing: data.playing,
+    rawPresence: data.presence, // Store raw values
+    rawPlaying: data.playing, // Store raw values
+    smoothedPresence: smoothedPresence, // Store calculated values
+    smoothedPlaying: smoothedPlaying, // Store calculated values
     frequency: data.frequency || null,
     note: data.note || null,
     octave: data.octave || null,
   };
 
-  // ✅ Store in Firestore
-  db.collection(COLLECTION_NAME)
-    .add(entry)
-    .then((docRef) => {
-      console.log(
-        `🔥 Firestore: Data saved successfully! Document ID: ${docRef.id}`
-      );
-    })
-    .catch((error) => {
-      console.error(`🚨 Firestore Error:`, error);
-    });
-
-  // ✅ Keep local real-time data
+  // Keep local real-time data regardless of presence
   proximityData.push(entry);
 
-  // ✅ Trim local data to last 24 hours
+  // Trim local data to last 24 hours
   let past24Hours = new Date();
   past24Hours.setHours(past24Hours.getHours() - 24);
   proximityData = proximityData.filter((d) => new Date(d.time) >= past24Hours);
 
-  updatePresence(data.presence, timestamp);
+  // Only store in Firestore if someone is actually present
+  // This saves on database usage
+  if (smoothedPresence) {
+    db.collection(COLLECTION_NAME)
+      .add(entry)
+      .then((docRef) => {
+        // console.log(`🔥 Firestore: Data saved successfully! Document ID: ${docRef.id}`);
+      })
+      .catch((error) => {
+        console.error(`🚨 Firestore Error:`, error);
+      });
+  } else {
+    // console.log("💾 Skipping Firestore storage since no one is present");
+  }
+
+  // Update presence using the smoothed values
+  updatePresence(smoothedPresence, smoothedPlaying, timestamp);
   updateCharts();
 }
 
 // **Track Player Presence & "Longest on Piano"**
-async function updatePresence(presenceDetected, timestamp) {
+async function updatePresence(presenceDetected, isPlaying, timestamp) {
   let presenceElement = document.getElementById("currentPresence");
   let longestDurationElement = document.getElementById("longestDuration");
   if (!presenceElement || !longestDurationElement) return;
 
+  // We're now working with smoothed values from processSensorData
+  // console.log(`Player status assessment: presence=${presenceDetected}, playing=${isPlaying}`);
+
+  // Handle situation when someone is at the piano (present)
   if (presenceDetected) {
-    if (!playerDetected) {
-      // ✅ Transition from No → Yes (new session detected)
-      playerDetected = true;
-      presence = true;
-      currentPlayerStartTime = timestamp;
+    // Update UI to show someone is present
+    presenceElement.innerText = isPlaying ? "Yes!" : "Present, not playing";
+    presenceElement.style.color = isPlaying ? "#52CF8C" : "#FFA500"; // Green when playing, Orange when just present
 
-      incrementPlayerCount(timestamp); // ✅ Counts player only if cooldown allows
+    // Track state
+    presence = true;
 
-      presenceElement.innerText = "Yes!";
-      presenceElement.style.color = "#52CF8C"; // Green
+    // Handle transition to playing
+    if (isPlaying) {
+      playing = true;
+
+      // If this is a new session (no player detected before)
+      if (!playerDetected) {
+        // console.log("✨ NEW PLAYER DETECTED!");
+        playerDetected = true;
+        currentPlayerStartTime = timestamp;
+        incrementPlayerCount(timestamp); // Increment player count
+      }
+      // If player was detected but not playing before, don't count as new player
+      // This handles breaks in playing while still present
     }
-  } else {
-    if (playerDetected) {
-      // ✅ Transition from Yes → No (player left)
+  }
+  // Handle situation when no one is at the piano (not present)
+  else {
+    // Only process departure if we previously detected someone
+    if (playerDetected || presence) {
+      // console.log("👋 PLAYER LEFT");
       playerDetected = false;
       presence = false;
+      playing = false;
+
       presenceElement.innerText = "No";
       presenceElement.style.color = "#EE4848"; // Red
 
-      // ✅ Calculate session duration and update longest time
+      // Calculate session duration and update longest time
       if (currentPlayerStartTime) {
         let duration = (timestamp - currentPlayerStartTime) / 1000;
+        // console.log(`Session duration: ${duration} seconds`);
 
         if (duration > longestDuration) {
           longestDuration = duration;
           longestDurationElement.innerText = formatTime(longestDuration);
+          // console.log(`🏆 New longest duration: ${formatTime(longestDuration)}`);
 
-          // ✅ Save longest duration in Firestore
+          // Save longest duration in Firestore
           try {
             await db.collection("stats").doc("global").set(
               {
@@ -223,6 +316,7 @@ async function updatePresence(presenceDetected, timestamp) {
               },
               { merge: true }
             );
+            // console.log(`✅ Saved new record to Firestore`);
           } catch (error) {
             console.error(
               "🚨 Error updating longest duration in Firestore:",
@@ -231,7 +325,7 @@ async function updatePresence(presenceDetected, timestamp) {
           }
         }
 
-        currentPlayerStartTime = null; // ✅ Reset session tracking
+        currentPlayerStartTime = null; // Reset session tracking
       }
     }
   }
@@ -239,40 +333,70 @@ async function updatePresence(presenceDetected, timestamp) {
 
 // **Load Historical Data from Firestore**
 async function loadHistoricalData() {
+  // console.log("Loading historical data from Firestore...");
   let sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-  let snapshot = await db
-    .collection(COLLECTION_NAME)
-    .where("time", ">=", sevenDaysAgo.toISOString())
-    .orderBy("time", "asc")
-    .get();
-
-  proximityData = snapshot.docs.map((doc) => doc.data());
-  updateCharts();
-
-  // ✅ Fetch stored totalPlayers & longestDuration
   try {
+    // First, load player data by day for the charts
+    let playerDataSnapshot = await db
+      .collection("player_counts")
+      .where("date", ">=", sevenDaysAgo.toISOString().split("T")[0])
+      .get();
+
+    // Initialize player data
+    playerData = {};
+
+    // Process player count data
+    playerDataSnapshot.forEach((doc) => {
+      const data = doc.data();
+      playerData[data.date] = data.count;
+      // console.log(`Loaded player count for ${data.date}: ${data.count}`);
+    });
+
+    // Load sensor data for proximity chart
+    let sensorSnapshot = await db
+      .collection(COLLECTION_NAME)
+      .where("time", ">=", sevenDaysAgo.toISOString())
+      .orderBy("time", "asc")
+      .limit(1000) // Limit to prevent too much data
+      .get();
+
+    proximityData = sensorSnapshot.docs.map((doc) => doc.data());
+    // console.log(`Loaded ${proximityData.length} sensor data points`);
+
+    // ✅ Fetch stored totalPlayers & longestDuration
     let statsDoc = await db.collection("stats").doc("global").get();
     if (statsDoc.exists) {
       let data = statsDoc.data();
+      // console.log("Retrieved global stats:", data);
 
       if (data.totalPlayers !== undefined) {
         document.getElementById("totalPlayers").innerText = data.totalPlayers;
+        // console.log(`Total players: ${data.totalPlayers}`);
       }
 
       if (data.longestDuration !== undefined) {
         longestDuration = data.longestDuration;
         document.getElementById("longestDuration").innerText =
           formatTime(longestDuration);
+        // console.log(`Longest duration: ${formatTime(longestDuration)}`);
       }
+    } else {
+      // console.log("No global stats document found. Creating one...");
+      // Initialize the global stats if they don't exist
+      await db.collection("stats").doc("global").set({
+        totalPlayers: 0,
+        longestDuration: 0,
+      });
     }
+
+    updateCharts();
   } catch (error) {
-    console.error("🚨 Error fetching stats from Firestore:", error);
+    console.error("🚨 Error loading data from Firestore:", error);
   }
 }
 
-// **Update Charts to Include Volume**
 // **Update Charts**
 function updateCharts() {
   if (!playerChart || !proximityChart) return;
@@ -368,7 +492,6 @@ function toggleChart(mode) {
 }
 
 // **Create Charts**
-// **Create Charts**
 function createCharts() {
   let ctxBar = document.getElementById("playerChart")?.getContext("2d");
   let ctxLine = document.getElementById("proximityChart")?.getContext("2d");
@@ -432,5 +555,5 @@ window.addEventListener("DOMContentLoaded", () => {
   createCharts();
   loadHistoricalData();
   setInterval(loadHistoricalData, 300000); // ✅ Refresh historical data every 5 minutes
-  // checkPresenceTimeout(); // ✅ Start absence detection timer
+  checkPresenceTimeout(); // ✅ Start absence detection timer
 });
