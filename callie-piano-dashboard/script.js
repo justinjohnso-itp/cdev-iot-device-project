@@ -1,3 +1,6 @@
+let lastMessageTime = Date.now(); // ✅ Stores the last received message timestamp
+const messageTimeout = 5000; // ✅ 5 seconds timeout for detecting absence
+
 // MQTT Configuration
 const broker = "wss://tigoe.net/mqtt";
 let client;
@@ -23,7 +26,7 @@ let chartMode = "week"; // 'week' or 'day'
 let playerChart, proximityChart;
 
 // Add this near the other constants at the top
-const COLLECTION_NAME = "piano_data";
+const COLLECTION_NAME = "piano_data-1";
 
 // ✅ Replace with your Firebase config
 // ✅ Firebase Config
@@ -61,16 +64,31 @@ function onMessage(topic, payload) {
   let message = payload.toString();
   console.log("MQTT Message Received:", message);
 
-  // Extract distance and volume from the message
-  let distanceMatch = message.match(/distance: (\d+)/);
-  let volumeMatch = message.match(/volume: (\d+)/);
-  if (distanceMatch && volumeMatch) {
-    let distance = parseInt(distanceMatch[1]);
-    let volume = parseInt(volumeMatch[1]);
-    let timestamp = new Date();
+  try {
+    let data = JSON.parse(message); // ✅ Parse JSON
+    lastMessageTime = Date.now(); // ✅ Update last message timestamp
 
-    processSensorData(distance, volume, timestamp);
+    let timestamp = new Date();
+    processSensorData(data, timestamp);
+  } catch (error) {
+    console.error("🚨 Error parsing MQTT message:", error);
   }
+}
+
+function checkPresenceTimeout() {
+  let currentTime = Date.now();
+  let timeSinceLastMessage = currentTime - lastMessageTime;
+
+  if (timeSinceLastMessage > messageTimeout) {
+    console.log(
+      "🚨 No messages received for",
+      messageTimeout / 1000,
+      "seconds. Assuming person has left."
+    );
+    updatePresence(false, new Date()); // ✅ Manually switch presence to false
+  }
+
+  setTimeout(checkPresenceTimeout, 1000); // ✅ Check every second
 }
 
 // **Handle Errors & Disconnections**
@@ -82,21 +100,64 @@ function onDisconnect() {
   console.log("Disconnected from MQTT broker.");
 }
 
+let lastPlayerTime = 0; // ✅ Tracks the last time a player was counted
+const playerCooldown = 5000; // ✅ 5 seconds cooldown
+
+async function incrementPlayerCount(timestamp) {
+  let currentTime = timestamp.getTime();
+
+  if (currentTime - lastPlayerTime > playerCooldown) {
+    let currentDate = timestamp.toISOString().split("T")[0]; // Get YYYY-MM-DD format
+    if (!playerData[currentDate]) playerData[currentDate] = 0;
+    playerData[currentDate]++;
+
+    let totalPlayers = Object.values(playerData).reduce(
+      (sum, val) => sum + val,
+      0
+    );
+
+    // ✅ Update UI
+    document.getElementById("totalPlayers").innerText = totalPlayers;
+
+    // ✅ Store in Firestore
+    try {
+      await db.collection("stats").doc("global").set(
+        {
+          totalPlayers: totalPlayers,
+        },
+        { merge: true }
+      );
+    } catch (error) {
+      console.error("🚨 Error updating total players in Firestore:", error);
+    }
+
+    updateCharts();
+    lastPlayerTime = currentTime;
+  }
+}
+
 // **Map ToF sensor values for line chart**
 function mapProximity(distance) {
   return Math.max(0, 250 - distance) / 2.5; // Convert range into 0-100 scale
 }
 // **Process Incoming Sensor Data**
-function processSensorData(distance, volume, timestamp) {
-  console.log(`Distance: ${distance}, Volume: ${volume}`);
+function processSensorData(data, timestamp) {
+  console.log(
+    `Distance: ${data.distance}, Volume: ${data.volume}, Presence: ${data.presence}, Playing: ${data.playing}`
+  );
 
   let entry = {
     time: timestamp.toISOString(),
-    distance: mapProximity(distance),
-    volume: volume,
+    distance: mapProximity(data.distance),
+    volume: data.volume,
+    presence: data.presence,
+    playing: data.playing,
+    frequency: data.frequency || null,
+    note: data.note || null,
+    octave: data.octave || null,
   };
 
-  // ✅ Store in Firestore with explicit logging
+  // ✅ Store in Firestore
   db.collection(COLLECTION_NAME)
     .add(entry)
     .then((docRef) => {
@@ -108,7 +169,7 @@ function processSensorData(distance, volume, timestamp) {
       console.error(`🚨 Firestore Error:`, error);
     });
 
-  // ✅ Also keep local real-time data
+  // ✅ Keep local real-time data
   proximityData.push(entry);
 
   // ✅ Trim local data to last 24 hours
@@ -116,44 +177,63 @@ function processSensorData(distance, volume, timestamp) {
   past24Hours.setHours(past24Hours.getHours() - 24);
   proximityData = proximityData.filter((d) => new Date(d.time) >= past24Hours);
 
-  updatePresence(distance, volume, timestamp);
+  updatePresence(data.presence, timestamp);
   updateCharts();
 }
 
 // **Track Player Presence & "Longest on Piano"**
-function updatePresence(distance, volume, timestamp) {
-  let detected = distance < 250; // Threshold for detecting a person
+async function updatePresence(presenceDetected, timestamp) {
   let presenceElement = document.getElementById("currentPresence");
-  let totalPlayersElement = document.getElementById("totalPlayers");
   let longestDurationElement = document.getElementById("longestDuration");
+  if (!presenceElement || !longestDurationElement) return;
 
-  if (!presenceElement || !totalPlayersElement || !longestDurationElement) {
-    console.error("One or more elements not found in DOM.");
-    return;
-  }
+  if (presenceDetected) {
+    if (!playerDetected) {
+      // ✅ Transition from No → Yes (new session detected)
+      playerDetected = true;
+      presence = true;
+      currentPlayerStartTime = timestamp;
 
-  if (detected && !playerDetected) {
-    playerDetected = true;
-    presence = true;
-    currentPlayerStartTime = timestamp;
-    presenceElement.innerText = "Yes!";
-    presenceElement.style.color = "#52CF8C"; // Green
-  }
+      incrementPlayerCount(timestamp); // ✅ Counts player only if cooldown allows
 
-  if (!detected && playerDetected) {
-    playerDetected = false;
-    presence = false;
-    presenceElement.innerText = "No";
-    presenceElement.style.color = "#EE4848"; // Red
+      presenceElement.innerText = "Yes!";
+      presenceElement.style.color = "#52CF8C"; // Green
+    }
+  } else {
+    if (playerDetected) {
+      // ✅ Transition from Yes → No (player left)
+      playerDetected = false;
+      presence = false;
+      presenceElement.innerText = "No";
+      presenceElement.style.color = "#EE4848"; // Red
 
-    if (currentPlayerStartTime) {
-      let duration = (timestamp - currentPlayerStartTime) / 1000; // Convert to seconds
-      if (duration > longestDuration) {
-        longestDuration = duration;
-        longestDurationElement.innerText = formatTime(longestDuration);
+      // ✅ Calculate session duration and update longest time
+      if (currentPlayerStartTime) {
+        let duration = (timestamp - currentPlayerStartTime) / 1000;
+
+        if (duration > longestDuration) {
+          longestDuration = duration;
+          longestDurationElement.innerText = formatTime(longestDuration);
+
+          // ✅ Save longest duration in Firestore
+          try {
+            await db.collection("stats").doc("global").set(
+              {
+                longestDuration: longestDuration,
+              },
+              { merge: true }
+            );
+          } catch (error) {
+            console.error(
+              "🚨 Error updating longest duration in Firestore:",
+              error
+            );
+          }
+        }
+
+        currentPlayerStartTime = null; // ✅ Reset session tracking
       }
     }
-    currentPlayerStartTime = null;
   }
 }
 
@@ -170,6 +250,26 @@ async function loadHistoricalData() {
 
   proximityData = snapshot.docs.map((doc) => doc.data());
   updateCharts();
+
+  // ✅ Fetch stored totalPlayers & longestDuration
+  try {
+    let statsDoc = await db.collection("stats").doc("global").get();
+    if (statsDoc.exists) {
+      let data = statsDoc.data();
+
+      if (data.totalPlayers !== undefined) {
+        document.getElementById("totalPlayers").innerText = data.totalPlayers;
+      }
+
+      if (data.longestDuration !== undefined) {
+        longestDuration = data.longestDuration;
+        document.getElementById("longestDuration").innerText =
+          formatTime(longestDuration);
+      }
+    }
+  } catch (error) {
+    console.error("🚨 Error fetching stats from Firestore:", error);
+  }
 }
 
 // **Update Charts to Include Volume**
@@ -237,12 +337,20 @@ function getWeekData() {
 
 // **Pagination Controls: Move to Previous or Next Period**
 function prevPeriod() {
-  startDate.setDate(startDate.getDate() - (chartMode === "week" ? 7 : 1));
+  if (chartMode === "week") {
+    startDate.setDate(startDate.getDate() - 7); // Move back by a week
+  } else {
+    startDate.setDate(startDate.getDate() - 1); // Move back by a day
+  }
   updateCharts();
 }
 
 function nextPeriod() {
-  startDate.setDate(startDate.getDate() + (chartMode === "week" ? 7 : 1));
+  if (chartMode === "week") {
+    startDate.setDate(startDate.getDate() + 7); // Move forward by a week
+  } else {
+    startDate.setDate(startDate.getDate() + 1); // Move forward by a day
+  }
   updateCharts();
 }
 
@@ -322,6 +430,7 @@ function createCharts() {
 window.addEventListener("DOMContentLoaded", () => {
   setupMQTT();
   createCharts();
-  loadHistoricalData(); // ✅ Load stored data on page load
+  loadHistoricalData();
   setInterval(loadHistoricalData, 300000); // ✅ Refresh historical data every 5 minutes
+  // checkPresenceTimeout(); // ✅ Start absence detection timer
 });
