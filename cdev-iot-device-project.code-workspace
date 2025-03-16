@@ -5,13 +5,19 @@
 		},
 		{
 			"path": "callie-piano-dashboard"
+		},
+		{
+			"path": "."
+		},
+		{
+			"path": "nodejs-dashboard"
 		}
 	],
 	"settings": {
 		"github-actions.workflows.pinned.workflows": [
 			"dynamic/pages/pages-build-deployment"
 		],
-		"liveServer.settings.multiRootWorkspaceName": "mqtt-js-client",
+		"liveServer.settings.multiRootWorkspaceName": "callie-piano-dashboard",
 		"liveServer.settings.port": 5501
 	}
 }

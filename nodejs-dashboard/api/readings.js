@@ -1,4 +1,4 @@
-import { getDbPool } from "../lib/db";
+import { getDbPool } from "../lib/db.js";
 
 export default async function handler(req, res) {
   // Set CORS headers

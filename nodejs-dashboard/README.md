@@ -1,6 +1,6 @@
-# Piano Activity Dashboard
+# Piano Dashboard
 
-A real-time dashboard that tracks piano activity using MQTT, Node.js, and Vercel Postgres. This project visualizes data from a connected piano setup with sensors that detect player presence and notes played.
+A dashboard application that visualizes piano activity data from MQTT messages.
 
 ## Features
 
@@ -18,27 +18,70 @@ A real-time dashboard that tracks piano activity using MQTT, Node.js, and Vercel
 - **Real-time Communication**: MQTT
 - **Deployment**: Vercel
 
-## Local Setup
+## Local Development Setup
 
-1. Clone this repository
-2. Install dependencies:
+### Setting Up PostgreSQL Database
+
+1. **Install PostgreSQL**
+
+   ```bash
+   # macOS (using Homebrew)
+   brew install postgresql
+   brew services start postgresql
+   
+   # Ubuntu/Debian
+   sudo apt update
+   sudo apt install postgresql postgresql-contrib
+   sudo systemctl start postgresql
    ```
+
+2. **Create a Database**
+
+   ```bash
+   # Connect to PostgreSQL
+   psql postgres
+   
+   # Create a new database
+   CREATE DATABASE piano_dashboard;
+   
+   # Create a user (optional)
+   CREATE USER pianouser WITH PASSWORD 'yourpassword';
+   
+   # Grant privileges
+   GRANT ALL PRIVILEGES ON DATABASE piano_dashboard TO pianouser;
+   
+   # Exit postgres console
+   \q
+   ```
+
+3. **Update Environment Variables**
+
+   Edit the `.env` file to match your database credentials:
+   ```
+   POSTGRES_URL=postgresql://pianouser:yourpassword@localhost:5432/piano_dashboard
+   ```
+
+### Installation and Setup
+
+1. **Install dependencies**
+
+   ```bash
    npm install
    ```
-3. Create a local Postgres database and update the `.env` file:
+
+2. **Initialize the database**
+
+   ```bash
+   npm run setup
    ```
-   POSTGRES_URL=postgresql://username:password@localhost:5432/piano_dashboard
-   MQTT_USER=conndev
-   MQTT_PASSWORD=b4s1l!
+
+3. **Start the server**
+
+   ```bash
+   npm start
    ```
-4. Build the frontend:
-   ```
-   npm run build
-   ```
-5. Run with Vercel CLI for local development:
-   ```
-   vercel dev
-   ```
+
+The application will be available at [http://localhost:3000](http://localhost:3000).
 
 ## Deployment to Vercel
 
@@ -78,10 +121,10 @@ The application uses two main tables:
 
 ## API Endpoints
 
-- GET `/api/readings?hours=24` - Get sensor readings for the past X hours
-- GET `/api/sessions?days=7` - Get player sessions for the past X days
-- GET `/api/stats` - Get dashboard statistics
-- GET `/api/status` - Server status check
+- `GET /api/readings` - Get sensor readings
+- `GET /api/sessions` - Get piano session data
+- `GET /api/stats` - Get statistics
+- `GET /status` - Get server status
 
 ## License
 

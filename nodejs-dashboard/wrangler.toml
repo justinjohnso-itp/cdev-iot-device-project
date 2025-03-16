@@ -7,8 +7,8 @@ crons = ["*/5 * * * *"] # Run every 5 minutes
 
 [[d1_databases]]
 binding = "DB"
-database_name = "piano_data"
-database_id = "YOUR_DB_ID_AFTER_CREATION"
+database_name = "piano_dashboard"
+database_id = "d3d60a90-c12c-46fe-81a0-ab717e1e7529"
 
 [env.production]
 # Production environment variables

@@ -1,4 +1,8 @@
 import { createPool } from "@vercel/postgres";
+import { config } from "dotenv";
+
+// Load environment variables
+config();
 
 // Create a connection pool
 let pool;
