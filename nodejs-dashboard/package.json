@@ -8,7 +8,7 @@
     "start": "node server.js",
     "dev": "wrangler pages dev ./src --port 3000",
     "build": "mkdir -p public && cp -r src/* public/",
-    "deploy": "wrangler pages publish ./src",
+    "deploy": "wrangler pages deploy ./public",
     "setup": "node setup.js"
   },
   "engines": {

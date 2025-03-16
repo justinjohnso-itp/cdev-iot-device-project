@@ -9,11 +9,11 @@ let startDate = new Date();
 let chartMode = "week"; // 'week' or 'day'
 startDate.setDate(startDate.getDate() - 6); // Start with the last 7 days
 
-// API base URL - auto-detect between local and production
+// API base URL - auto-detect between local and production environments
 const apiBaseUrl =
   window.location.hostname === "localhost"
-    ? "http://localhost:3000/api"
-    : "/api";
+    ? "http://localhost:8788/api" // For local Wrangler Pages dev server
+    : "/api"; // For deployed Cloudflare Pages site
 
 // Initialize Dashboard
 async function initDashboard() {
