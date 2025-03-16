@@ -5,4 +5,4 @@ pages_build_output_dir = "public"
 [[d1_databases]]
 binding = "DB"
 database_name = "piano_dashboard"
-database_id = "d3d60a90-c12c-46fe-81a0-ab717e1e7529"
+database_id = "92ec4f3f-22b3-420c-9afc-997b835e39cb"

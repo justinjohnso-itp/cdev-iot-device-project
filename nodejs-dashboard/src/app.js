@@ -15,6 +15,18 @@ const apiBaseUrl =
     ? "http://localhost:8788/api" // For local Wrangler Pages dev server
     : "/api"; // For deployed Cloudflare Pages site
 
+// MQTT Configuration
+const mqttBroker = "wss://tigoe.net/mqtt";
+const mqttOptions = {
+  clean: true,
+  connectTimeout: 10000,
+  clientId: "dashboard-browser-" + Math.floor(Math.random() * 1000000),
+  username: "conndev",
+  password: "b4s1l!",
+};
+const mqttTopic = "conndev/piano";
+let mqttClient;
+
 // Initialize Dashboard
 async function initDashboard() {
   try {
@@ -32,6 +44,8 @@ async function initDashboard() {
       updateCharts();
       updateNote();
     }, 5000);
+
+    setupMQTT();
   } catch (error) {
     console.error("Dashboard initialization error:", error);
     updateConnectionStatus("Connection failed", false);
@@ -441,3 +455,55 @@ function toggleChart(mode) {
 
 // Initialize the dashboard when the page loads
 window.addEventListener("DOMContentLoaded", initDashboard);
+
+// Setup MQTT
+function setupMQTT() {
+  try {
+    mqttClient = mqtt.connect(mqttBroker, mqttOptions);
+
+    mqttClient.on("connect", () => {
+      console.log("Connected to MQTT broker");
+      updateConnectionStatus("Connected to MQTT", true);
+      mqttClient.subscribe(mqttTopic);
+    });
+
+    mqttClient.on("message", async (topic, payload) => {
+      const message = payload.toString();
+      console.log("MQTT message received:", message);
+
+      try {
+        // Parse MQTT data and post to API
+        const distanceMatch = message.match(/distance: (\d+)/);
+        const volumeMatch = message.match(/volume: (\d+)/);
+
+        if (distanceMatch && volumeMatch) {
+          const data = {
+            distance: parseInt(distanceMatch[1]),
+            volume: parseInt(volumeMatch[1]),
+          };
+
+          // Add optional fields if present
+          const frequencyMatch = message.match(/frequency: ([\d.]+)/);
+          if (frequencyMatch) data.frequency = parseFloat(frequencyMatch[1]);
+
+          const noteMatch = message.match(/note: ([A-G]#?)/);
+          if (noteMatch) data.note = noteMatch[1];
+
+          const octaveMatch = message.match(/octave: (\d+)/);
+          if (octaveMatch) data.octave = parseInt(octaveMatch[1]);
+
+          // Post to API
+          await fetch(`${apiBaseUrl}/readings`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data),
+          });
+        }
+      } catch (e) {
+        console.error("Error processing MQTT message:", e);
+      }
+    });
+  } catch (e) {
+    console.error("MQTT setup failed:", e);
+  }
+}

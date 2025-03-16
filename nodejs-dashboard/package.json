@@ -8,7 +8,7 @@
     "start": "node server.js",
     "dev": "wrangler pages dev ./src --port 3000",
     "build": "mkdir -p public && cp -r src/* public/",
-    "deploy": "wrangler pages deploy ./public",
+    "deploy": "npm run build && wrangler pages deploy ./public --project-name=piano-dashboard && wrangler deploy --config wrangler.toml",
     "setup": "node setup.js"
   },
   "engines": {

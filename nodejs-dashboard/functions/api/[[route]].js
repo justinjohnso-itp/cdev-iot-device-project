@@ -49,8 +49,9 @@ router.get("/readings", async (request, env) => {
       };
     });
 
+    // Format response to match what frontend expects
     return addCorsHeaders(
-      new Response(JSON.stringify(resultsWithFormattedDates), {
+      new Response(JSON.stringify(readings.results), {
         headers: { "Content-Type": "application/json" },
       })
     );
