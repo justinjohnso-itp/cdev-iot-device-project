@@ -132,7 +132,11 @@ Follow consistent structure across projects (backend, frontend, full-stack):
 - **Descriptive Naming:** Use clear, descriptive, and unambiguous names for variables, functions, classes, and modules. Names should reveal intent.
 - **Modularity and SRP:** Generate code that is modular and follows the Single Responsibility Principle (SRP). Break down large, complex functions or components into smaller, cohesive units with well-defined purposes. Avoid overly long functions or classes.
 - **Minimize Complexity:** Avoid overly complex control flows (deep nesting, complex conditionals). Refactor complex logic into smaller, well-named helper functions.
-- **Comments Sparingly:** Use comments primarily to explain *why* something is done (e.g., rationale behind a non-obvious decision, workaround for a bug), not *what* the code is doing (which should be clear from the code itself). Keep comments up-to-date.
+- **Minimal and Succinct Comments:** Use comments very sparingly. Assume the reader understands standard code constructs and individual lines. Comments should ONLY be used to explain:
+    - The high-level purpose or logic of particularly complex functions or algorithms.
+    - Non-obvious design decisions, trade-offs, or workarounds.
+    - External factors or requirements influencing the code that aren't apparent from the code itself.
+    Avoid comments that merely restate what the code does (e.g., `// increment counter`). Ensure comments are concise and add significant value beyond what the code already communicates.
 - **Consistency:** Maintain consistency with the existing codebase's style, patterns, and conventions, even if they differ slightly from general best practices (unless specifically tasked with refactoring).
 - **Actively Discourage Duplication:** Actively avoid generating duplicated or near-duplicated code blocks. If similar logic is required in multiple locations, **propose creating reusable functions, methods, classes, modules, or components**. Suggest refactoring opportunities where existing code could be generalized for reuse.
 - **Mandatory Source Attribution:** **ALL** significant code blocks, algorithms, complex logic structures, non-trivial configurations, or specific implementation techniques generated or adapted by Copilot that are derived from or inspired by *any* external source **MUST** be documented. External sources include, but are not limited to:
@@ -232,8 +236,8 @@ When asked to generate a write-up, development log, or blog post (e.g., via the 
 > - [Peter Kallok's promotion letter](https://www.notion.so/Peter-Kallok-s-promotion-letter-0cd6f9e146294528a2913d26a67d813c?pvs=21)
 > - [APP Essay 1](https://www.notion.so/APP-Essay-1-Final-15a9127f465d8031ab22e7b97424b898?pvs=21)
 > - [APP Essay 2](https://www.notion.so/APP-Essay-2-Final-1549127f465d8035a301ca09feaafd04?pvs=21)
-> -([https://www.notion.so/Solfege-ml5-js-1b39127f465d80cf86b3f8b6e824cd1f?pvs=21](https://www.notion.so/Melody-Solfege-ml5-js-1b39127f465d80cf86b3f8b6e824cd1f?pvs=21))
-> -([https://justin-itp.notion.site/A-Bitsy-Myst-game-1ac9127f465d80f2837af5449fa08a92?pvs=4](https://www.notion.so/A-Bitsy-Myst-game-1ac9127f465d80f2837af5449fa08a92?pvs=21))
+> -((([https://www.notion.so/Solfege-ml5-js-1b39127f465d80cf86b3f8b6e824cd1f?pvs=21](https://www.notion.so/Melody-Solfege-ml5-js-1b39127f465d80cf86b3f8b6e824cd1f?pvs=21))))
+> -((([https://justin-itp.notion.site/A-Bitsy-Myst-game-1ac9127f465d80f2837af5449fa08a92?pvs=4](https://www.notion.so/A-Bitsy-Myst-game-1ac9127f465d80f2837af5449fa08a92?pvs=21))))
 > - [Designing the controller](https://www.notion.so/Midterm-Designing-the-controller-pivoting-to-a-different-style-of-game-1a79127f465d80cca95ac7127af780bf?pvs=21)
 > - [Making a polyrhythm synth](https://www.notion.so/Rhythm-Making-a-polyrhythm-synth-1a59127f465d80fd936cde2974f209c9?pvs=21)
 > -(https://justin-itp.notion.site/Making-a-hypertext-game-in-Twine-1a59127f465d809ba7f6c75719ffbf6a?pvs=4)
@@ -241,11 +245,11 @@ When asked to generate a write-up, development log, or blog post (e.g., via the 
 > -(https://justin-itp.notion.site/Building-an-enclosure-for-a-connected-device-19e9127f465d80d785a7e1d5231b6b70?pvs=4)
 > - [Laser cutting](https://www.notion.so/Laser-cutting-1959127f465d80ab85dfec5ae5fa5d52?pvs=21)
 > - [Data dashboard for Arduino](https://www.notion.so/Data-dashboard-for-a-Wifi-connected-Arduino-1949127f465d80f68c4aec33a6e8ba6d?pvs=21)
-> -([https://justin-itp.notion.site/Spider-Man-Platformer-Part-1-1929127f465d80dcafafd9871ac1ea82?pvs=4](https://www.notion.so/Spider-Man-Platformer-Part-1-1929127f465d80dcafafd9871ac1ea82?pvs=21))
+> -((([https://justin-itp.notion.site/Spider-Man-Platformer-Part-1-1929127f465d80dcafafd9871ac1ea82?pvs=4](https://www.notion.so/Spider-Man-Platformer-Part-1-1929127f465d80dcafafd9871ac1ea82?pvs=21))))
 > - [Just be a rock](https://www.notion.so/Just-be-a-rock-18c9127f465d8071bd50d93e14e22a63?pvs=21)
-> -(https://www.notion.so/Final-Building-my-online-DJ-presence-1579127f465d806f9d8ae8ea22ca8a00?pvs=21)
-> -(https://www.notion.so/Midterm-Tangible-music-looper-10e9127f465d8027913dd7522da1378a?pvs=21)
-> -([https://dusty-pineapple.notion.site/Div-III-Retro-1d89127f465d808281f3ed600a315398?pvs=21](https://www.notion.so/Div-III-Retro-1d89127f465d808281f3ed600a315398?pvs=21))
+> -(((https://www.notion.so/Final-Building-my-online-DJ-presence-1579127f465d806f9d8ae8ea22ca8a00?pvs=21)))
+> -(((https://www.notion.so/Midterm-Tangible-music-looper-10e9127f465d8027913dd7522da1378a?pvs=21)))
+> -((([https://dusty-pineapple.notion.site/Div-III-Retro-1d89127f465d808281f3ed600a315398?pvs=21](https://www.notion.so/Div-III-Retro-1d89127f465d808281f3ed600a315398?pvs=21))))
 
 ---
 
@@ -280,3 +284,4 @@ In addition to the chat commands in `/`, the following behaviors are defined for
 ---
 
 > Place this file in .github/copilot-instructions.md within your repository to apply these guidelines. Regularly review and update these instructions as project standards evolve and best practices for AI interaction emerge.
+>
